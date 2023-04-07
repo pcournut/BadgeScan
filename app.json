@@ -1,33 +1,60 @@
 {
   "expo": {
-    "name": "badge-scan",
+    "name": "Kento Scan",
     "slug": "badge-scan",
+    "description": "This is Kento native scan app.",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/kento-logo.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/kento-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "updates": {
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/954c2e4b-110d-4c20-9def-c81533dddadd"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow BadgeScan to access camera.",
+        "NSMicrophoneUsageDescription": "This app uses the microphone to scan barcodes on event tickets."
+      },
+      "bundleIdentifier": "com.pierrecournut.badgescan"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.pierrecournut.badgescan"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Allow BadgeScan to access camera."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "954c2e4b-110d-4c20-9def-c81533dddadd"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
     }
   }
 }
