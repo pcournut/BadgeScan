@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import { Badge, EnrichedUser } from "../types";
+import { EnrichedUser } from "../types";
 
 export const ScanScreenContext = createContext({
   enrichedUsers: [] as EnrichedUser[],

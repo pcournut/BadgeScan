@@ -1,8 +1,7 @@
-import { useRef, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { useState } from "react";
+import { View, Text, Pressable, TextInput } from "react-native";
 import sharedStyles from "../styles/shared";
 import loginStyles from "../styles/login";
-import PhoneInput from "react-native-phone-number-input";
 import {
   CodeField,
   Cursor,
@@ -12,10 +11,9 @@ import {
 
 export const LoginScreen = ({ navigation }) => {
   // Functions
-  const sendCode = async (phoneCountryCode: string, phoneNumber: string) => {
+  const sendCode = async (email: string) => {
     var formdata = new FormData();
-    formdata.append("phoneNumber", phoneNumber);
-    formdata.append("phoneCountryCode", phoneCountryCode);
+    formdata.append("email", email);
 
     var requestOptions: RequestInit = {
       method: "POST",
@@ -25,7 +23,7 @@ export const LoginScreen = ({ navigation }) => {
 
     try {
       const response = await fetch(
-        "https://club-soda-test-pierre.bubbleapps.io/version-test/api/1.1/wf/PasswordlessSendCode",
+        "https://kento.events/version-test/api/1.1/wf/login-email-otp",
         requestOptions
       );
       const result = await response.text();
@@ -35,15 +33,10 @@ export const LoginScreen = ({ navigation }) => {
     }
   };
 
-  const verifyCode = async (
-    phoneCountryCode: string,
-    phoneNumber: string,
-    twilioCode: string
-  ) => {
+  const verifyCode = async (email: string, code: string) => {
     var formdata = new FormData();
-    formdata.append("phoneNumber", phoneNumber);
-    formdata.append("code", twilioCode);
-    formdata.append("phoneCountryCode", phoneCountryCode);
+    formdata.append("email", email);
+    formdata.append("OTP", code);
 
     var requestOptions: RequestInit = {
       method: "POST",
@@ -53,13 +46,13 @@ export const LoginScreen = ({ navigation }) => {
 
     try {
       const response = await fetch(
-        "https://club-soda-test-pierre.bubbleapps.io/version-test/api/1.1/wf/PasswordlessVerifyCode",
+        "https://kento.events/version-test/api/1.1/wf/login",
         requestOptions
       );
       const json = await response.json();
       console.log(json);
       navigation.navigate("Configure", {
-        userFirstName: json.response.userFirstName,
+        user_id: json.response.user_id,
         token: json.response.token,
       });
     } catch (error) {
@@ -67,10 +60,9 @@ export const LoginScreen = ({ navigation }) => {
     }
   };
 
-  const devConnect = async (phoneCountryCode: string, phoneNumber: string) => {
+  const devConnect = async (email: string) => {
     var formdata = new FormData();
-    formdata.append("phoneNumber", phoneNumber);
-    formdata.append("phoneCountryCode", phoneCountryCode);
+    formdata.append("email", email);
 
     var requestOptions: RequestInit = {
       method: "POST",
@@ -80,26 +72,32 @@ export const LoginScreen = ({ navigation }) => {
 
     try {
       const response = await fetch(
-        "https://club-soda-test-pierre.bubbleapps.io/version-test/api/1.1/wf/PasswordlessVerifyCodeNOTWILIO",
+        "https://kento.events/version-test/api/1.1/wf/admin-login",
         requestOptions
       );
       const json = await response.json();
       console.log(json);
       navigation.navigate("Configure", {
-        userFirstName: json.response.userFirstName,
+        user_id: json.response.user_id,
         token: json.response.token,
       });
     } catch (error) {
       console.log("error", error);
     }
+  };
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+    return emailRegex.test(email);
   };
 
   // State variables
-  const [phoneNumber, setPhoneNumber] = useState("674670066");
-  const [formattedPhoneNumber, setFormattedPhoneNumber] = useState("");
-  const phoneInput = useRef<PhoneInput>(null);
+  // -- email
+  const [email, setEmail] = useState("pierre.cournut@gmail.com");
+  const [emailIsValid, setEmailIsValid] = useState(true);
+  // -- UI states
   const [showCode, setShowCode] = useState(false);
-
+  // -- code
   const CELL_COUNT = 4;
   const [value, setValue] = useState("");
   const ref = useBlurOnFulfill({ value, cellCount: CELL_COUNT });
@@ -110,22 +108,14 @@ export const LoginScreen = ({ navigation }) => {
 
   return (
     <View style={sharedStyles.container}>
-      <PhoneInput
-        ref={phoneInput}
-        defaultValue={phoneNumber}
-        defaultCode="FR"
-        layout="first"
-        onChangeText={(text) => {
-          setPhoneNumber(text);
-        }}
-        onChangeFormattedText={(text) => {
-          setFormattedPhoneNumber(text);
-        }}
-        withDarkTheme
-        withShadow
-        autoFocus
+      <TextInput
+        value={email}
+        onChangeText={(email) => setEmail(email)}
+        placeholder="Enter email"
+        style={loginStyles.textInput}
       />
-      {phoneInput.current?.isValidNumber(phoneNumber) && (
+
+      {validateEmail(email) && (
         <>
           <Pressable
             style={({ pressed }) => [
@@ -135,11 +125,11 @@ export const LoginScreen = ({ navigation }) => {
               sharedStyles.pinkButton,
             ]}
             onPress={() => {
-              sendCode(`+${phoneInput.current?.getCallingCode()}`, phoneNumber);
+              sendCode(email);
               setShowCode(true);
             }}
           >
-            <Text style={sharedStyles.textPinkButton}>Receive SMS</Text>
+            <Text style={sharedStyles.textPinkButton}>Send code</Text>
           </Pressable>
           <Pressable
             style={({ pressed }) => [
@@ -149,13 +139,10 @@ export const LoginScreen = ({ navigation }) => {
               sharedStyles.pinkButton,
             ]}
             onPress={() => {
-              devConnect(
-                `+${phoneInput.current?.getCallingCode()}`,
-                phoneNumber
-              );
+              devConnect(email);
             }}
           >
-            <Text style={sharedStyles.textPinkButton}>No Twilio connect</Text>
+            <Text style={sharedStyles.textPinkButton}>Dev connect</Text>
           </Pressable>
         </>
       )}
@@ -190,11 +177,7 @@ export const LoginScreen = ({ navigation }) => {
             sharedStyles.pinkButton,
           ]}
           onPress={() => {
-            verifyCode(
-              `+${phoneInput.current?.getCallingCode()}`,
-              phoneNumber,
-              value
-            );
+            verifyCode(email, value);
           }}
         >
           <Text style={sharedStyles.textPinkButton}>Confirm</Text>
@@ -211,10 +194,7 @@ export const LoginScreen = ({ navigation }) => {
                 },
               ]}
               onPress={() => {
-                sendCode(
-                  `+${phoneInput.current?.getCallingCode()}`,
-                  phoneNumber
-                );
+                sendCode(email);
               }}
             >
               <Text style={loginStyles.pinkText}>Resend code</Text>

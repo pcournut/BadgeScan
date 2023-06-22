@@ -21,7 +21,7 @@ import { AntDesign, Feather } from "@expo/vector-icons";
 import Colors from "../colors";
 import scanStyles from "../styles/scan";
 import sharedStyles from "../styles/shared";
-import { BadgeEntity, EnrichedUser } from "../types";
+import { KentoEntity, EnrichedUser } from "../types";
 
 type Ref = {
   displayComponent: () => void;
@@ -47,20 +47,27 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
   React.useImperativeHandle(ref, () => ({ displayComponent }));
 
   // Components
-  const selectItem = (badgeEntity: BadgeEntity) => {
-    badgeEntity.isSelect = !badgeEntity.isSelect;
+  const selectItem = (KentoEntity: KentoEntity) => {
+    KentoEntity.isSelect = !KentoEntity.isSelect;
     var newEnrichedUsers = Object.assign([], enrichedUsers);
-    const badgeEntityIndex = enrichedUsers[
+    const KentoEntityIndex = enrichedUsers[
       selectedUserIndex
-    ].badgeEntities.findIndex(
-      (item: BadgeEntity) => item._id === badgeEntity._id
+    ].kentoEntities.findIndex(
+      (item: KentoEntity) => item._id === KentoEntity._id
     );
-    newEnrichedUsers[selectedUserIndex][badgeEntityIndex] = badgeEntity;
+    newEnrichedUsers[selectedUserIndex][KentoEntityIndex] = KentoEntity;
     setEnrichedUsers(newEnrichedUsers);
   };
 
-  const BadgeEntityItem = (props: { badgeEntity: BadgeEntity }) => (
-    <View style={scanStyles.badgeEntityContainer}>
+  // TODO: factorize imageDict
+  const imageDict = {
+    Artist: require("../assets/Artist.png"),
+    Community: require("../assets/Community.png"),
+    Guest: require("../assets/Guest.png"),
+    Participant: require("../assets/Participant.png"),
+  };
+  const KentoEntityItem = (props: { kentoEntity: KentoEntity }) => (
+    <View style={scanStyles.kentoEntityContainer}>
       <Pressable
         style={({ pressed }) => [
           {
@@ -68,36 +75,45 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
           },
         ]}
         onPress={() => {
-          if (!props.badgeEntity.isUsed) {
-            selectItem(props.badgeEntity);
+          if (!props.kentoEntity.isUsed) {
+            selectItem(props.kentoEntity);
           }
         }}
       >
-        {props.badgeEntity.isSelect ? (
-          <Feather name="x-square" size={24} color="black" />
-        ) : (
-          <Feather
-            name="square"
-            size={24}
-            color={props.badgeEntity.isUsed ? "white" : "black"}
-          />
-        )}
-        <Image
+        <View
           style={{
-            width: 60,
-            height: 60,
-            borderRadius: 60 / 2,
-            borderWidth: 1,
-            marginTop: 10,
-            backgroundColor: props.badgeEntity.isUsed ? "grey" : "transparent",
+            borderRadius: 10,
+            backgroundColor: props.kentoEntity.isUsed
+              ? Colors.GREEN
+              : "transparent",
           }}
-          source={{
-            uri: `https:${props.badgeEntity.parentBadgeIcon}`,
-          }}
-        />
-        <Text style={sharedStyles.blackText}>
-          {props.badgeEntity.parentBadgeName}
-        </Text>
+        >
+          {props.kentoEntity.isSelect ? (
+            <Feather name="x-square" size={24} color="black" />
+          ) : props.kentoEntity.isUsed ? (
+            <Text style={{ color: "green", textAlign: "right" }}>
+              validated
+            </Text>
+          ) : (
+            <Feather
+              name="square"
+              size={24}
+              color={props.kentoEntity.isUsed ? "white" : "black"}
+            />
+          )}
+          <Image
+            style={{
+              width: 60,
+              height: 60,
+              marginTop: 5,
+              marginBottom: 5,
+            }}
+            source={imageDict[props.kentoEntity.accessKentoType]}
+          />
+          <Text style={sharedStyles.blackText}>
+            {props.kentoEntity.accessName}
+          </Text>
+        </View>
       </Pressable>
     </View>
   );
@@ -105,12 +121,12 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
   // Functions
   const validateSelection = () => {
     var newEnrichedUsers: EnrichedUser[] = Object.assign([], enrichedUsers);
-    for (const badgeEntity of newEnrichedUsers[selectedUserIndex]
-      .badgeEntities) {
-      if (badgeEntity.isSelect) {
-        badgeEntity.isUsed = true;
-        badgeEntity.isSelect = false;
-        badgeEntity.toUpdate = true;
+    for (const KentoEntity of newEnrichedUsers[selectedUserIndex]
+      .kentoEntities) {
+      if (KentoEntity.isSelect) {
+        KentoEntity.isUsed = true;
+        KentoEntity.isSelect = false;
+        KentoEntity.toUpdate = true;
       }
     }
     setEnrichedUsers(newEnrichedUsers);
@@ -150,14 +166,16 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
                   marginLeft: "5%",
                 }}
               >
-                {enrichedUsers[selectedUserIndex].last_name},{" "}
-                {enrichedUsers[selectedUserIndex].first_name}
+                {enrichedUsers[selectedUserIndex].first_name}{" "}
+                {enrichedUsers[selectedUserIndex].last_name}
               </Text>
               <Text
                 style={{
                   fontSize: 14,
+                  fontWeight: "300",
                   lineHeight: 21,
                   letterSpacing: 0.25,
+                  marginLeft: "5%",
                 }}
               >
                 {enrichedUsers[selectedUserIndex].email}
@@ -166,8 +184,8 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
                 horizontal={true}
                 style={{ width: "90%", marginLeft: "5%" }}
               >
-                {enrichedUsers[selectedUserIndex].badgeEntities.map((item) => (
-                  <BadgeEntityItem key={item._id} badgeEntity={item} />
+                {enrichedUsers[selectedUserIndex].kentoEntities.map((item) => (
+                  <KentoEntityItem key={item._id} kentoEntity={item} />
                 ))}
               </ScrollView>
               <View
@@ -184,8 +202,8 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
                     {
                       opacity: pressed ? 0.6 : 1.0,
                     },
-                    enrichedUsers[selectedUserIndex].badgeEntities.filter(
-                      (item: BadgeEntity) => item.isSelect
+                    enrichedUsers[selectedUserIndex].kentoEntities.filter(
+                      (item: KentoEntity) => item.isSelect
                     ).length > 0
                       ? scanStyles.pinkButton
                       : scanStyles.greyButton,
@@ -195,11 +213,11 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
                   }}
                 >
                   <Text style={sharedStyles.textPinkButton}>
-                    {enrichedUsers[selectedUserIndex].badgeEntities.filter(
-                      (item: BadgeEntity) => item.isSelect
+                    {enrichedUsers[selectedUserIndex].kentoEntities.filter(
+                      (item: KentoEntity) => item.isSelect
                     ).length > 0
                       ? "Validate"
-                      : "Select pass to validate"}
+                      : `Select pass to validate`}
                   </Text>
                 </Pressable>
               </View>

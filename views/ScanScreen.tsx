@@ -2,7 +2,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React, { useEffect, useState } from "react";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { ScanScreenContext } from "../contexts/ScanScreenContext";
-import { Badge, BadgeEntity, EnrichedUser } from "../types";
+import { Access, KentoEntity, EnrichedUser, UpdatedEntity } from "../types";
 import { ListTab } from "./ListTab";
 import { CameraTab } from "./CameraTab";
 
@@ -23,9 +23,9 @@ export const ScanScreen = ({ navigation, route }) => {
 
   // Functions
   const participantListUpdate = async (
-    badgeEntityIds: string[],
+    kentoEntityIds: string[],
     token: string,
-    badges: [Badge],
+    accesses: [Access],
     scanTerminal: string
   ) => {
     var myHeaders = new Headers();
@@ -33,12 +33,19 @@ export const ScanScreen = ({ navigation, route }) => {
 
     var formdata = new FormData();
     formdata.append(
-      "ChangedBadgeEntities",
-      `[${badgeEntityIds.map((item) => '"' + item + '"')}]`
+      "scanned_entities",
+      `[${kentoEntityIds.map((item) => '"' + item + '"')}]`
     );
-    formdata.append("ScanTerminal", `${scanTerminal}`);
-    formdata.append("Badges", `[${badges.map(({ _id }) => '"' + _id + '"')}]`);
-    formdata.append("LastQueryUnixTimeStamp", `${lastQueryUnixTimeStamp}`);
+    formdata.append("scan_terminal", `${scanTerminal}`);
+    formdata.append(
+      "accesses",
+      `[${accesses.map(({ _id }) => '"' + _id + '"')}]`
+    );
+    formdata.append(
+      "last_query_unix_timestamp",
+      `${lastQueryUnixTimeStamp.toString()}`
+    );
+    // console.log(`formdata: ${JSON.stringify(formdata)}`);
 
     var requestOptions: RequestInit = {
       method: "POST",
@@ -49,41 +56,74 @@ export const ScanScreen = ({ navigation, route }) => {
 
     try {
       const response = await fetch(
-        "https://club-soda-test-pierre.bubbleapps.io/version-test/api/1.1/wf/ParticipantListUpdate",
+        "https://kento.events/version-test/api/1.1/wf/participant-list-update",
         requestOptions
       );
+      // console.log(`response ${JSON.stringify(response)}`);
       const json = await response.json();
       var newEnrichedUsers: EnrichedUser[] = Object.assign([], enrichedUsers);
-      if (json.response.participantsUpdate.length > 1) {
-        for (const badgeEntityString of json.response.participantsUpdate) {
-          const badgeEntity = JSON.parse(badgeEntityString);
-          const userIndex = enrichedUsers.findIndex(
-            (item: EnrichedUser) => item._id === badgeEntity.userId
-          );
-          const badgeEntityIndex = enrichedUsers[
-            userIndex
-          ].badgeEntities.findIndex(
-            (item: BadgeEntity) => item._id === badgeEntity.badgeEntityId
-          );
-          newEnrichedUsers[userIndex].badgeEntities[badgeEntityIndex].isUsed =
-            badgeEntity.isUsed === "oui";
+      if ("updated_entities_text" in json.response) {
+        const updatedEntities: [UpdatedEntity] = JSON.parse(
+          json.response.updated_entities_text
+        );
+        console.log(`Number of updated entities: ${updatedEntities.length}`);
+        if (updatedEntities.length > 0) {
+          console.log(JSON.stringify(updatedEntities));
+          for (const updatedEntity of updatedEntities) {
+            const userIndex = enrichedUsers.findIndex(
+              (item: EnrichedUser) => item._id === updatedEntity.owner._id
+            );
+            if (userIndex !== -1) {
+              const kentoEntityIndex = enrichedUsers[
+                userIndex
+              ].kentoEntities.findIndex(
+                (item: KentoEntity) => item._id === updatedEntity._id
+              );
+              if (kentoEntityIndex !== -1) {
+                newEnrichedUsers[userIndex].kentoEntities[
+                  kentoEntityIndex
+                ].isUsed = updatedEntity.scan_terminal !== undefined;
+              } else {
+                const kentoEntity: KentoEntity = {
+                  _id: updatedEntity._id,
+                  access: updatedEntity.access,
+                  owner: updatedEntity.owner._id,
+                  scan_terminal: updatedEntity.scan_terminal,
+                  isUsed:
+                    updatedEntity.scan_terminal !== undefined &&
+                    updatedEntity.scan_terminal !== undefined &&
+                    updatedEntity.scan_terminal.length > 0,
+                };
+                newEnrichedUsers[userIndex].kentoEntities.push(kentoEntity);
+              }
+            } else {
+              const kentoEntity: KentoEntity = {
+                _id: updatedEntity._id,
+                access: updatedEntity.access,
+                owner: updatedEntity.owner._id,
+                scan_terminal: updatedEntity.scan_terminal,
+                isUsed:
+                  updatedEntity.scan_terminal !== undefined &&
+                  updatedEntity.scan_terminal.length > 0,
+              };
+              const enrichedUser: EnrichedUser = {
+                _id: updatedEntity.owner._id,
+                first_name: updatedEntity.owner.first_name,
+                last_name: updatedEntity.owner.last_name,
+                email: updatedEntity.owner.email,
+                kentoEntities: [kentoEntity],
+              };
+              newEnrichedUsers.push(enrichedUser);
+            }
+          }
         }
-      } else if (json.response.participantsUpdate.length == 1) {
-        const badgeEntity = JSON.parse(json.response.participantsUpdate);
-        const userIndex = enrichedUsers.findIndex(
-          (item: EnrichedUser) => item._id === badgeEntity.userId
-        );
-        const badgeEntityIndex = enrichedUsers[
-          userIndex
-        ].badgeEntities.findIndex(
-          (item: BadgeEntity) => item._id === badgeEntity.badgeEntityId
-        );
-        newEnrichedUsers[userIndex].badgeEntities[badgeEntityIndex].isUsed =
-          badgeEntity.isUsed === "oui";
+      } else {
+        console.log(`Empty updated entities.`);
       }
       setEnrichedUsers(newEnrichedUsers);
+      // TODO: update with date from workflow answer when available
+      setLastQueryUnixTimeStamp(json.response.last_query_unix_timestamp);
       console.log("Updated with server.");
-      setLastQueryUnixTimeStamp(json.response.LastQueryUnixTimeStamp);
     } catch (error) {
       console.log("error", error);
     }
@@ -92,19 +132,19 @@ export const ScanScreen = ({ navigation, route }) => {
   // Server update
   useEffect(() => {
     const interval = setInterval(() => {
-      var changedBadgeEntities = [];
+      var changedKentoEntities = [];
       for (const user of enrichedUsers) {
-        for (const badgeEntity of user.badgeEntities) {
-          if (badgeEntity.toUpdate) {
-            changedBadgeEntities = changedBadgeEntities.concat(badgeEntity._id);
-            badgeEntity.toUpdate = false;
+        for (const kentoEntity of user.kentoEntities) {
+          if (kentoEntity.toUpdate) {
+            changedKentoEntities = changedKentoEntities.concat(kentoEntity._id);
+            kentoEntity.toUpdate = false;
           }
         }
       }
       participantListUpdate(
-        changedBadgeEntities,
+        changedKentoEntities,
         route.params.token,
-        route.params.badges,
+        route.params.accesses,
         route.params.scanTerminal
       );
     }, 5000);
