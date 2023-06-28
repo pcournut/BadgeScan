@@ -15,7 +15,8 @@ export interface Access {
 export interface KentoEntity {
     _id: string
     access: string
-    owner: string
+    owner: string?;
+    owner_email: string
     scan_terminal: string
     isUsed?: boolean
     isSelect?: boolean
@@ -49,9 +50,9 @@ export interface User {
 }
 
 export interface EnrichedUser {
-    _id: string
-    first_name: string
-    last_name: string
+    // _id: string
+    first_name: string?;
+    last_name: string?;
     email: string
     kentoEntities: [KentoEntity]
 }

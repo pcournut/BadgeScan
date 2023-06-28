@@ -71,7 +71,8 @@ export const ScanScreen = ({ navigation, route }) => {
           console.log(JSON.stringify(updatedEntities));
           for (const updatedEntity of updatedEntities) {
             const userIndex = enrichedUsers.findIndex(
-              (item: EnrichedUser) => item._id === updatedEntity.owner._id
+              // (item: EnrichedUser) => item._id === updatedEntity.owner._id
+              (item: EnrichedUser) => item.email === updatedEntity.owner.email
             );
             if (userIndex !== -1) {
               const kentoEntityIndex = enrichedUsers[
@@ -88,6 +89,7 @@ export const ScanScreen = ({ navigation, route }) => {
                   _id: updatedEntity._id,
                   access: updatedEntity.access,
                   owner: updatedEntity.owner._id,
+                  owner_email: updatedEntity.owner.email,
                   scan_terminal: updatedEntity.scan_terminal,
                   isUsed:
                     updatedEntity.scan_terminal !== undefined &&
@@ -101,13 +103,14 @@ export const ScanScreen = ({ navigation, route }) => {
                 _id: updatedEntity._id,
                 access: updatedEntity.access,
                 owner: updatedEntity.owner._id,
+                owner_email: updatedEntity.owner.email,
                 scan_terminal: updatedEntity.scan_terminal,
                 isUsed:
                   updatedEntity.scan_terminal !== undefined &&
                   updatedEntity.scan_terminal.length > 0,
               };
               const enrichedUser: EnrichedUser = {
-                _id: updatedEntity.owner._id,
+                // _id: updatedEntity.owner._id,
                 first_name: updatedEntity.owner.first_name,
                 last_name: updatedEntity.owner.last_name,
                 email: updatedEntity.owner.email,

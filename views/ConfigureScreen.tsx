@@ -76,9 +76,9 @@ export const ConfigureScreen = ({ navigation, route }) => {
         const kentoEntities: [KentoEntity] = kentoEntityJSON.response.results;
         console.log(`kentoEntites :${kentoEntities.length}`);
         const userResponse = await fetch(
-          `https://kento.events/version-test/api/1.1/obj/User?api_token=${token}&cursor=${cursor}&constraints=[{ "key": "_id", "constraint_type": "in", "value": [${kentoEntities.map(
-            ({ owner }) => '"' + owner + '"'
-          )}]}]`,
+          `https://kento.events/version-test/api/1.1/obj/User?api_token=${token}&cursor=${cursor}&constraints=[{ "key": "_id", "constraint_type": "in", "value": [${kentoEntities
+            .filter((item: KentoEntity) => item.owner !== undefined)
+            .map(({ owner }) => '"' + owner + '"')}]}]`,
           requestOptions
         );
         // console.log(`response ${await userResponse.text()}`);
@@ -103,7 +103,8 @@ export const ConfigureScreen = ({ navigation, route }) => {
             kentoEntity.accessName = access.name;
             kentoEntity.accessKentoType = access.kento_type;
             var userIndex = enrichedUsers.findIndex(
-              (user) => user._id === kentoEntity.owner
+              // (user) => user._id === kentoEntity.owner
+              (user) => user.email === kentoEntity.owner_email
             );
             if (userIndex !== -1) {
               enrichedUsers[userIndex].kentoEntities.push(kentoEntity);
@@ -112,16 +113,19 @@ export const ConfigureScreen = ({ navigation, route }) => {
                 (user) => user._id === kentoEntity.owner
               );
               if (user === undefined) {
+                const enrichedUser: EnrichedUser = {
+                  email: user.authentication.email.email,
+                  kentoEntities: [kentoEntity],
+                };
+                enrichedUsers.push(enrichedUser);
                 // Handle missing owner fields in Bubble (deleted in 03.2023)
-                console.log(`error with kentoEntity: ${kentoEntity._id}`);
+                // console.log(`error with kentoEntity: ${kentoEntity._id}`);
               } else {
                 const enrichedUser: EnrichedUser = {
-                  _id: user._id,
+                  // _id: user._id,
                   first_name: user.first_name,
                   last_name: user.last_name,
-                  // Handle empty user emails for search in ListTab
                   email: user.authentication.email.email,
-                  // email: user.email == null ? "" : user.email,
                   kentoEntities: [kentoEntity],
                 };
                 enrichedUsers.push(enrichedUser);

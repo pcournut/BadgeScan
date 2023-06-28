@@ -134,7 +134,7 @@ export const ListTab = ({ route }) => {
         renderItem={({ item, index }) => (
           <EnrichedUserItem enrichedUser={item} index={index} />
         )}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.email}
       />
       <ScanBottomSheet ref={ref}></ScanBottomSheet>
     </View>
