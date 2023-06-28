@@ -191,6 +191,11 @@ export const ConfigureScreen = ({ navigation, route }) => {
       ]}
       onPress={() => {
         setSelectedEvent(event);
+        for (const access of accesses) {
+          if (access.isSelect) {
+            selectItem(access);
+          }
+        }
       }}
     >
       <View style={configureStyles.accessContainer}>
