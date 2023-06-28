@@ -14,8 +14,9 @@ const LogoTitle = (props: any) => {
   return (
     <View>
       <Image
-        style={{ width: 120, height: 20 }}
-        source={require("./assets/kento-text.jpg")}
+        style={{ width: 100, height: "100%" }}
+        // source={require("./assets/kento-text.jpg")}
+        source={require("./assets/kento-text-rose.jpg")}
         resizeMode="cover"
       />
     </View>
@@ -23,7 +24,12 @@ const LogoTitle = (props: any) => {
 };
 
 const MyCustomHeaderBackImage = () => (
-  <Feather name="arrow-left" size={30} color={Colors.PINK} />
+  <Feather
+    style={{ marginLeft: "8%" }}
+    name="arrow-left"
+    size={30}
+    color={Colors.PINK}
+  />
 );
 
 const App = () => {
@@ -33,8 +39,6 @@ const App = () => {
         screenOptions={({ route, navigation }) => ({
           headerBackImage: MyCustomHeaderBackImage,
           headerBackTitleVisible: false,
-          // header: <MyHeader></MyHeader>,
-          // headerStyle: {marginRight: "2%", marginLeft: "2%"},
           headerTitle: (props) => <LogoTitle {...props} />,
           headerRight: () => (
             <Pressable
@@ -42,6 +46,7 @@ const App = () => {
               style={({ pressed }) => [
                 {
                   opacity: pressed ? 0.6 : 1.0,
+                  marginRight: "8%",
                 },
               ]}
             >
