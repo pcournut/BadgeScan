@@ -1,10 +1,12 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { ScanScreenContext } from "../contexts/ScanScreenContext";
 import { Access, KentoEntity, EnrichedUser, UpdatedEntity } from "../types";
 import { ListTab } from "./ListTab";
 import { CameraTab } from "./CameraTab";
+import { devEndpoint, prodEndpoint } from "../constants";
+import { LoginContext } from "../contexts/LoginContext";
 
 const Tab = createBottomTabNavigator();
 
@@ -20,6 +22,9 @@ export const ScanScreen = ({ navigation, route }) => {
   const [lastQueryUnixTimeStamp, setLastQueryUnixTimeStamp] = useState<number>(
     Date.now()
   );
+
+  // Environment variables
+  const { devEnvironment } = useContext(LoginContext);
 
   // Functions
   const participantListUpdate = async (
@@ -56,7 +61,9 @@ export const ScanScreen = ({ navigation, route }) => {
 
     try {
       const response = await fetch(
-        "https://kento.events/version-test/api/1.1/wf/participant-list-update",
+        `${
+          devEnvironment ? devEndpoint : prodEndpoint
+        }/wf/participant-list-update`,
         requestOptions
       );
       // console.log(`response ${JSON.stringify(response)}`);

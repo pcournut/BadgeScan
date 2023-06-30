@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   Image,
   FlatList,
@@ -11,6 +11,8 @@ import sharedStyles from "../styles/shared";
 import configureStyles from "../styles/configure";
 import { Event, Access, KentoEntity, User, EnrichedUser } from "../types";
 import { Feather } from "@expo/vector-icons";
+import { devEndpoint, prodEndpoint } from "../constants";
+import { LoginContext } from "../contexts/LoginContext";
 
 export const ConfigureScreen = ({ navigation, route }) => {
   // Functions
@@ -21,13 +23,12 @@ export const ConfigureScreen = ({ navigation, route }) => {
     var requestOptions: RequestInit = {
       method: "GET",
       headers: myHeaders,
-      // body: formdata,
       redirect: "follow",
     };
 
     try {
       const response = await fetch(
-        "https://kento.events/version-test/api/1.1/wf/scanner-init",
+        `${devEnvironment ? devEndpoint : prodEndpoint}/wf/scanner-init`,
         requestOptions
       );
       const json = await response.json();
@@ -62,7 +63,9 @@ export const ConfigureScreen = ({ navigation, route }) => {
 
     try {
       const kentoEntityResponse = await fetch(
-        `https://kento.events/version-test/api/1.1/obj/KentoEntity?cursor=${cursor}&api_token=${token}&constraints=[{ "key": "access","constraint_type":"in","value":[${accesses.map(
+        `${
+          devEnvironment ? devEndpoint : prodEndpoint
+        }/obj/KentoEntity?cursor=${cursor}&api_token=${token}&constraints=[{ "key": "access","constraint_type":"in","value":[${accesses.map(
           ({ _id }) => '"' + _id + '"'
         )}]},{ "key": "status","constraint_type":"equals","value":"confirmed"}]`,
         requestOptions
@@ -76,7 +79,9 @@ export const ConfigureScreen = ({ navigation, route }) => {
         const kentoEntities: [KentoEntity] = kentoEntityJSON.response.results;
         console.log(`kentoEntites :${kentoEntities.length}`);
         const userResponse = await fetch(
-          `https://kento.events/version-test/api/1.1/obj/User?api_token=${token}&cursor=${cursor}&constraints=[{ "key": "_id", "constraint_type": "in", "value": [${kentoEntities
+          `${
+            devEnvironment ? devEndpoint : prodEndpoint
+          }/obj/User?api_token=${token}&cursor=${cursor}&constraints=[{ "key": "_id", "constraint_type": "in", "value": [${kentoEntities
             .filter((item: KentoEntity) => item.owner !== undefined)
             .map(({ owner }) => '"' + owner + '"')}]}]`,
           requestOptions
@@ -89,7 +94,6 @@ export const ConfigureScreen = ({ navigation, route }) => {
           userJSON.response.results.length > 0
         ) {
           const users: [User] = userJSON.response.results;
-          // console.log(`users: ${users[0].first_name}`);
           var enrichedUsers: EnrichedUser[] = [];
           for (const kentoEntity of kentoEntities) {
             kentoEntity.isUsed =
@@ -114,15 +118,16 @@ export const ConfigureScreen = ({ navigation, route }) => {
               );
               if (user === undefined) {
                 const enrichedUser: EnrichedUser = {
-                  email: user.authentication.email.email,
+                  // In case the user has not registered, his email is his user ID
+                  _id: kentoEntity.owner_email,
+                  email: kentoEntity.owner_email,
+                  last_name: kentoEntity.owner_email,
                   kentoEntities: [kentoEntity],
                 };
                 enrichedUsers.push(enrichedUser);
-                // Handle missing owner fields in Bubble (deleted in 03.2023)
-                // console.log(`error with kentoEntity: ${kentoEntity._id}`);
               } else {
                 const enrichedUser: EnrichedUser = {
-                  // _id: user._id,
+                  _id: user._id,
                   first_name: user.first_name,
                   last_name: user.last_name,
                   email: user.authentication.email.email,
@@ -264,6 +269,9 @@ export const ConfigureScreen = ({ navigation, route }) => {
   const [selectedEvent, setSelectedEvent] = useState<Event>(null);
   const [accesses, setAccesses] = useState<Access[]>([]);
   const [scanTerminal, setScanTerminal] = useState<string>("");
+
+  // Environment variables
+  const { devEnvironment } = useContext(LoginContext);
 
   // Init
   useEffect(() => {

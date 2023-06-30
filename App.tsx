@@ -8,31 +8,34 @@ import { ConfigureScreen } from "./views/ConfigureScreen";
 import { LoginScreen } from "./views/LoginScreen";
 import { ScanScreen } from "./views/ScanScreen";
 
-const Stack = createStackNavigator();
-
-const LogoTitle = (props: any) => {
-  return (
-    <View>
-      <Image
-        style={{ width: 100, height: "100%" }}
-        // source={require("./assets/kento-text.jpg")}
-        source={require("./assets/kento-text-rose.jpg")}
-        resizeMode="cover"
-      />
-    </View>
-  );
-};
-
-const MyCustomHeaderBackImage = () => (
-  <Feather
-    style={{ marginLeft: "8%" }}
-    name="arrow-left"
-    size={30}
-    color={Colors.PINK}
-  />
-);
-
 const App = () => {
+  // Components
+  const Stack = createStackNavigator();
+
+  const LogoTitle = (props: any) => {
+    return (
+      <View>
+        <Image
+          style={{
+            width: 100,
+            height: "100%",
+          }}
+          source={require("./assets/kento-text-rose.jpg")}
+          resizeMode="cover"
+        />
+      </View>
+    );
+  };
+
+  const MyCustomHeaderBackImage = () => (
+    <Feather
+      style={{ marginLeft: "8%" }}
+      name="arrow-left"
+      size={30}
+      color={Colors.PINK}
+    />
+  );
+
   return (
     <NavigationContainer>
       <Stack.Navigator

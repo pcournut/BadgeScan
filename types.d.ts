@@ -45,14 +45,14 @@ export interface User {
     _id: string
     first_name: string
     last_name: string
-    authentication: Authentication?
+    authentication: Authentication?;
     email: string?
 }
 
 export interface EnrichedUser {
-    // _id: string
+    _id: string
     first_name: string?;
-    last_name: string?;
+    last_name: string
     email: string
     kentoEntities: [KentoEntity]
 }
