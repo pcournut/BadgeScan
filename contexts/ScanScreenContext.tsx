@@ -6,4 +6,6 @@ export const ScanScreenContext = createContext({
   setEnrichedUsers: (value: EnrichedUser[]) => {},
   selectedUserIndex: 0,
   setSelectedUserIndex: (value: number) => {},
+  token: "",
+  selectedEvent: "",
 });

@@ -23,14 +23,15 @@ export interface KentoEntity {
     toUpdate? : boolean
     accessName?: string
     accessKentoType?: string
+    price?: string
 }
 
 export interface UpdatedEntity {
     _id: string
     access: string
     owner: User
-    scan_terminal: string?
-    scan_date: string?
+    scan_terminal?: string
+    scan_date?: string
 }
 
 export interface Email {
@@ -45,13 +46,13 @@ export interface User {
     _id: string
     first_name: string
     last_name: string
-    authentication: Authentication?;
-    email: string?
+    authentication?: Authentication
+    email?: string
 }
 
 export interface EnrichedUser {
     _id: string
-    first_name: string?;
+    first_name?: string
     last_name: string
     email: string
     kentoEntities: [KentoEntity]

@@ -5,6 +5,7 @@ import React, {
   useContext,
   useMemo,
   useRef,
+  useState,
 } from "react";
 
 import {
@@ -22,6 +23,8 @@ import Colors from "../colors";
 import scanStyles from "../styles/scan";
 import sharedStyles from "../styles/shared";
 import { KentoEntity, EnrichedUser } from "../types";
+import { devEndpoint, prodEndpoint } from "../constants";
+import { LoginContext } from "../contexts/LoginContext";
 
 type Ref = {
   displayComponent: () => void;
@@ -30,8 +33,13 @@ type Props = {};
 
 export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
   // Context
-  const { enrichedUsers, setEnrichedUsers, selectedUserIndex } =
-    useContext(ScanScreenContext);
+  const {
+    enrichedUsers,
+    setEnrichedUsers,
+    selectedUserIndex,
+    token,
+    selectedEvent,
+  } = useContext(ScanScreenContext);
 
   // BottomSheetModalProvider params
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
@@ -133,6 +141,57 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
     handleCloseModalPress();
   };
 
+  const getUserGuestlists = async (
+    token: string,
+    owner_email: string,
+    event_id: string
+  ) => {
+    var myHeaders = new Headers();
+    myHeaders.append("Authorization", `Bearer ${token}`);
+    console.log(token);
+
+    var formdata = new FormData();
+    formdata.append("owner_email", owner_email);
+    formdata.append("event_id", event_id);
+
+    var requestOptions: RequestInit = {
+      method: "POST",
+      headers: myHeaders,
+      body: formdata,
+      redirect: "follow",
+    };
+
+    console.log(JSON.stringify(formdata));
+    console.log(JSON.stringify(myHeaders));
+
+    try {
+      const response = await fetch(
+        `${devEnvironment ? devEndpoint : prodEndpoint}/wf/get-user-guestlists`,
+        requestOptions
+      );
+      const json = await response.json();
+      console.log(`json: ${json}`);
+      if ("entities_text" in json.response) {
+        const offers: [KentoEntity] = JSON.parse(json.response.entities_text);
+        console.log(
+          `entities: ${JSON.stringify(JSON.parse(json.response.entities_text))}`
+        );
+        setOffers(JSON.parse(json.response.entities_text));
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  };
+
+  // Environment variables
+  const { devEnvironment } = useContext(LoginContext);
+
+  // Variables
+  const [offers, setOffers] = useState<KentoEntity[]>([]);
+  const [displayOffers, setDisplayOffers] = useState(false);
+  const toggleSwitch = () =>
+    setDisplayOffers((previousState) => !previousState);
+
   return (
     <BottomSheetModalProvider>
       <View style={sharedStyles.container}>
@@ -141,7 +200,7 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
           index={1}
           snapPoints={snapPoints}
         >
-          <Pressable
+          {/* <Pressable
             style={({ pressed }) => [
               {
                 opacity: pressed ? 0.6 : 1.0,
@@ -153,10 +212,29 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
             }}
           >
             <AntDesign name="close" size={24} color="black" />
-          </Pressable>
+          </Pressable> */}
 
           {selectedUserIndex != -1 ? (
             <>
+              <Pressable
+                style={{ alignItems: "flex-end", marginRight: "5%" }}
+                onPress={() => {
+                  toggleSwitch();
+                  if (!displayOffers) {
+                    getUserGuestlists(
+                      token,
+                      enrichedUsers[selectedUserIndex].email,
+                      selectedEvent
+                    );
+                  }
+                }}
+              >
+                <Text
+                  style={{ fontWeight: "600", textDecorationLine: "underline" }}
+                >
+                  {displayOffers ? "See passes" : "See offers"}
+                </Text>
+              </Pressable>
               <Text
                 style={{
                   fontSize: 16,
@@ -180,13 +258,20 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
               >
                 {enrichedUsers[selectedUserIndex].email}
               </Text>
+
               <ScrollView
                 horizontal={true}
                 style={{ width: "90%", marginLeft: "5%" }}
               >
-                {enrichedUsers[selectedUserIndex].kentoEntities.map((item) => (
-                  <KentoEntityItem key={item._id} kentoEntity={item} />
-                ))}
+                {displayOffers
+                  ? offers.map((item) => (
+                      <KentoEntityItem key={item._id} kentoEntity={item} />
+                    ))
+                  : enrichedUsers[selectedUserIndex].kentoEntities.map(
+                      (item) => (
+                        <KentoEntityItem key={item._id} kentoEntity={item} />
+                      )
+                    )}
               </ScrollView>
               <View
                 style={{

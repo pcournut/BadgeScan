@@ -177,6 +177,7 @@ export const ConfigureScreen = ({ navigation, route }) => {
         nKentoEntities: nKentoEntities,
         enrichedUsers: enrichedUsers,
         scanTerminal: scanTerminal,
+        selectedEvent: selectedEvent._id,
       });
     } catch (error) {
       console.log("error", error);

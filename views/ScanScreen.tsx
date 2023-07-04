@@ -15,6 +15,10 @@ const listName = "List";
 
 export const ScanScreen = ({ navigation, route }) => {
   // Context variables
+  const [token, setToken] = useState(route.params.token);
+  const [selectedEvent, setSelectedEvent] = useState(
+    route.params.selectedEvent
+  );
   const [enrichedUsers, setEnrichedUsers] = useState<EnrichedUser[]>(
     route.params.enrichedUsers
   );
@@ -168,6 +172,8 @@ export const ScanScreen = ({ navigation, route }) => {
         setEnrichedUsers,
         selectedUserIndex,
         setSelectedUserIndex,
+        token,
+        selectedEvent,
       }}
     >
       <Tab.Navigator
