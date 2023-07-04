@@ -18,12 +18,12 @@ export interface KentoEntity {
     owner: string?;
     owner_email: string
     scan_terminal: string
+    access_name?: string
+    access_type?: string
+    price?: string
     isUsed?: boolean
     isSelect?: boolean
     toUpdate? : boolean
-    accessName?: string
-    accessKentoType?: string
-    price?: string
 }
 
 export interface UpdatedEntity {

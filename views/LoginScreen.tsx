@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -16,7 +16,6 @@ import {
   useClearByFocusCell,
 } from "react-native-confirmation-code-field";
 import { devEndpoint, prodEndpoint } from "../constants";
-import { LoginContext } from "../contexts/LoginContext";
 
 export const LoginScreen = ({ navigation }) => {
   // Functions
@@ -53,6 +52,8 @@ export const LoginScreen = ({ navigation }) => {
       redirect: "follow",
     };
 
+    console.log(JSON.stringify(formdata));
+
     try {
       const response = await fetch(
         `${devEnvironment ? devEndpoint : prodEndpoint}/wf/login`,
@@ -63,6 +64,7 @@ export const LoginScreen = ({ navigation }) => {
       navigation.navigate("Configure", {
         user_id: json.response.user_id,
         token: json.response.token,
+        devEnvironment: devEnvironment,
       });
     } catch (error) {
       console.log("error", error);
@@ -89,6 +91,7 @@ export const LoginScreen = ({ navigation }) => {
       navigation.navigate("Configure", {
         user_id: json.response.user_id,
         token: json.response.token,
+        devEnvironment: devEnvironment,
       });
     } catch (error) {
       console.log("error", error);
@@ -117,87 +120,28 @@ export const LoginScreen = ({ navigation }) => {
 
   // Environment variables
   const [devEnvironment, setDevEnvironment] = useState(true);
-  const toggleSwitch = () =>
-    setDevEnvironment((previousState) => !previousState);
+  const toggleSwitch = () => setDevEnvironment(!devEnvironment);
 
   return (
-    <LoginContext.Provider
-      value={{
-        devEnvironment,
-        setDevEnvironment,
-      }}
-    >
-      <SafeAreaView style={{ flex: 1 }}>
-        <Text>Environment: {devEnvironment ? "dev" : "prod"}</Text>
-        <Switch
-          trackColor={{ false: "#767577", true: "#81b0ff" }}
-          thumbColor={devEnvironment ? "#f5dd4b" : "#f4f3f4"}
-          ios_backgroundColor="#3e3e3e"
-          onValueChange={toggleSwitch}
-          value={devEnvironment}
+    <SafeAreaView style={{ flex: 1 }}>
+      <Text>Environment: {devEnvironment ? "dev" : "prod"}</Text>
+      <Switch
+        trackColor={{ false: "#767577", true: "#81b0ff" }}
+        thumbColor={devEnvironment ? "#f5dd4b" : "#f4f3f4"}
+        ios_backgroundColor="#3e3e3e"
+        onValueChange={toggleSwitch}
+        value={devEnvironment}
+      />
+      <View style={sharedStyles.container}>
+        <TextInput
+          value={email}
+          onChangeText={(email) => setEmail(email)}
+          placeholder="Enter email"
+          style={loginStyles.textInput}
         />
-        <View style={sharedStyles.container}>
-          <TextInput
-            value={email}
-            onChangeText={(email) => setEmail(email)}
-            placeholder="Enter email"
-            style={loginStyles.textInput}
-          />
 
-          {validateEmail(email) && (
-            <>
-              <Pressable
-                style={({ pressed }) => [
-                  {
-                    opacity: pressed ? 0.6 : 1.0,
-                  },
-                  sharedStyles.pinkButton,
-                ]}
-                onPress={() => {
-                  sendCode(email);
-                  setShowCode(true);
-                }}
-              >
-                <Text style={sharedStyles.textPinkButton}>Send code</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  {
-                    opacity: pressed ? 0.6 : 1.0,
-                  },
-                  sharedStyles.pinkButton,
-                ]}
-                onPress={() => {
-                  devConnect(email);
-                }}
-              >
-                <Text style={sharedStyles.textPinkButton}>Dev connect</Text>
-              </Pressable>
-            </>
-          )}
-          {showCode && (
-            <CodeField
-              ref={ref}
-              {...props}
-              // Use `caretHidden={false}` when users can't paste a text value, because context menu doesn't appear
-              value={value}
-              onChangeText={setValue}
-              cellCount={CELL_COUNT}
-              rootStyle={loginStyles.codeFieldRoot}
-              keyboardType="number-pad"
-              textContentType="oneTimeCode"
-              renderCell={({ index, symbol, isFocused }) => (
-                <Text
-                  key={index}
-                  style={[loginStyles.cell, isFocused && loginStyles.focusCell]}
-                  onLayout={getCellOnLayoutHandler(index)}
-                >
-                  {symbol || (isFocused ? <Cursor /> : null)}
-                </Text>
-              )}
-            />
-          )}
-          {value.length == CELL_COUNT && (
+        {validateEmail(email) && (
+          <>
             <Pressable
               style={({ pressed }) => [
                 {
@@ -206,33 +150,84 @@ export const LoginScreen = ({ navigation }) => {
                 sharedStyles.pinkButton,
               ]}
               onPress={() => {
-                verifyCode(email, value);
+                sendCode(email);
+                setShowCode(true);
               }}
             >
-              <Text style={sharedStyles.textPinkButton}>Confirm</Text>
+              <Text style={sharedStyles.textPinkButton}>Send code</Text>
             </Pressable>
-          )}
-          {showCode && (
-            <>
-              <View style={sharedStyles.containerRow}>
-                <Text style={loginStyles.greyText}>Did not receive?</Text>
-                <Pressable
-                  style={({ pressed }) => [
-                    {
-                      opacity: pressed ? 0.6 : 1.0,
-                    },
-                  ]}
-                  onPress={() => {
-                    sendCode(email);
-                  }}
-                >
-                  <Text style={loginStyles.pinkText}>Resend code</Text>
-                </Pressable>
-              </View>
-            </>
-          )}
-        </View>
-      </SafeAreaView>
-    </LoginContext.Provider>
+            <Pressable
+              style={({ pressed }) => [
+                {
+                  opacity: pressed ? 0.6 : 1.0,
+                },
+                sharedStyles.pinkButton,
+              ]}
+              onPress={() => {
+                devConnect(email);
+              }}
+            >
+              <Text style={sharedStyles.textPinkButton}>Dev connect</Text>
+            </Pressable>
+          </>
+        )}
+        {showCode && (
+          <CodeField
+            ref={ref}
+            {...props}
+            // Use `caretHidden={false}` when users can't paste a text value, because context menu doesn't appear
+            value={value}
+            onChangeText={setValue}
+            cellCount={CELL_COUNT}
+            rootStyle={loginStyles.codeFieldRoot}
+            keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            renderCell={({ index, symbol, isFocused }) => (
+              <Text
+                key={index}
+                style={[loginStyles.cell, isFocused && loginStyles.focusCell]}
+                onLayout={getCellOnLayoutHandler(index)}
+              >
+                {symbol || (isFocused ? <Cursor /> : null)}
+              </Text>
+            )}
+          />
+        )}
+        {value.length == CELL_COUNT && (
+          <Pressable
+            style={({ pressed }) => [
+              {
+                opacity: pressed ? 0.6 : 1.0,
+              },
+              sharedStyles.pinkButton,
+            ]}
+            onPress={() => {
+              verifyCode(email, value);
+            }}
+          >
+            <Text style={sharedStyles.textPinkButton}>Confirm</Text>
+          </Pressable>
+        )}
+        {showCode && (
+          <>
+            <View style={sharedStyles.containerRow}>
+              <Text style={loginStyles.greyText}>Did not receive?</Text>
+              <Pressable
+                style={({ pressed }) => [
+                  {
+                    opacity: pressed ? 0.6 : 1.0,
+                  },
+                ]}
+                onPress={() => {
+                  sendCode(email);
+                }}
+              >
+                <Text style={loginStyles.pinkText}>Resend code</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </View>
+    </SafeAreaView>
   );
 };

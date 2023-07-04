@@ -1,4 +1,3 @@
-import { Button } from "@rneui/themed";
 import React, {
   forwardRef,
   useCallback,
@@ -24,14 +23,16 @@ import scanStyles from "../styles/scan";
 import sharedStyles from "../styles/shared";
 import { KentoEntity, EnrichedUser } from "../types";
 import { devEndpoint, prodEndpoint } from "../constants";
-import { LoginContext } from "../contexts/LoginContext";
 
 type Ref = {
   displayComponent: () => void;
 };
 type Props = {};
 
-export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
+export const ScanBottomSheet = forwardRef<Ref, { route: any }>((props, ref) => {
+  // Access the route prop here
+  const { route } = props;
+
   // Context
   const {
     enrichedUsers,
@@ -51,6 +52,8 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
 
   const displayComponent = () => {
     handlePresentModalPress();
+    setOffers([]);
+    setDisplayOffers(false);
   };
   React.useImperativeHandle(ref, () => ({ displayComponent }));
 
@@ -76,6 +79,8 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
   };
   const KentoEntityItem = (props: { kentoEntity: KentoEntity }) => (
     <View style={scanStyles.kentoEntityContainer}>
+      {props.kentoEntity.price === undefined ||
+        props.kentoEntity.price === "FREE"}
       <Pressable
         style={({ pressed }) => [
           {
@@ -83,7 +88,11 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
           },
         ]}
         onPress={() => {
-          if (!props.kentoEntity.isUsed) {
+          if (
+            (props.kentoEntity.price === undefined ||
+              props.kentoEntity.price === "FREE") &&
+            !props.kentoEntity.isUsed
+          ) {
             selectItem(props.kentoEntity);
           }
         }}
@@ -102,12 +111,15 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
             <Text style={{ color: "green", textAlign: "right" }}>
               validated
             </Text>
-          ) : (
+          ) : props.kentoEntity.price === undefined ||
+            props.kentoEntity.price === "FREE" ? (
             <Feather
               name="square"
               size={24}
               color={props.kentoEntity.isUsed ? "white" : "black"}
             />
+          ) : (
+            <Text style={{ color: "grey", textAlign: "right" }}>unusable</Text>
           )}
           <Image
             style={{
@@ -116,11 +128,16 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
               marginTop: 5,
               marginBottom: 5,
             }}
-            source={imageDict[props.kentoEntity.accessKentoType]}
+            source={imageDict[props.kentoEntity.access_type]}
           />
           <Text style={sharedStyles.blackText}>
-            {props.kentoEntity.accessName}
+            {props.kentoEntity.access_name}
           </Text>
+          {props.kentoEntity.price !== undefined && (
+            <Text style={sharedStyles.blackText}>
+              {props.kentoEntity.price}
+            </Text>
+          )}
         </View>
       </Pressable>
     </View>
@@ -129,12 +146,21 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
   // Functions
   const validateSelection = () => {
     var newEnrichedUsers: EnrichedUser[] = Object.assign([], enrichedUsers);
-    for (const KentoEntity of newEnrichedUsers[selectedUserIndex]
+    for (const kentoEntity of newEnrichedUsers[selectedUserIndex]
       .kentoEntities) {
-      if (KentoEntity.isSelect) {
-        KentoEntity.isUsed = true;
-        KentoEntity.isSelect = false;
-        KentoEntity.toUpdate = true;
+      if (kentoEntity.isSelect) {
+        kentoEntity.isUsed = true;
+        kentoEntity.isSelect = false;
+        kentoEntity.toUpdate = true;
+      }
+    }
+    for (let [index, kentoEntity] of offers.entries()) {
+      if (kentoEntity.isSelect) {
+        kentoEntity.isUsed = true;
+        kentoEntity.isSelect = false;
+        kentoEntity.toUpdate = true;
+        newEnrichedUsers[selectedUserIndex].kentoEntities.push(kentoEntity);
+        delete offers[index];
       }
     }
     setEnrichedUsers(newEnrichedUsers);
@@ -148,11 +174,16 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
   ) => {
     var myHeaders = new Headers();
     myHeaders.append("Authorization", `Bearer ${token}`);
-    console.log(token);
+    // myHeaders.append(
+    //   "Authorization",
+    //   `Bearer 1687187724797x532446159231898940`
+    // );
 
     var formdata = new FormData();
     formdata.append("owner_email", owner_email);
     formdata.append("event_id", event_id);
+    // formdata.append("owner_email", "axel.duheme@gmail.com");
+    // formdata.append("event_id", "1686509948185x333270189445742600");
 
     var requestOptions: RequestInit = {
       method: "POST",
@@ -161,16 +192,17 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
       redirect: "follow",
     };
 
-    console.log(JSON.stringify(formdata));
-    console.log(JSON.stringify(myHeaders));
+    console.log(`devEnvironment: ${route.params.devEnvironment}`);
 
     try {
       const response = await fetch(
-        `${devEnvironment ? devEndpoint : prodEndpoint}/wf/get-user-guestlists`,
+        `${
+          route.params.devEnvironment ? devEndpoint : prodEndpoint
+        }/wf/get-user-guestlists`,
         requestOptions
       );
       const json = await response.json();
-      console.log(`json: ${json}`);
+      console.log(`json: ${JSON.stringify(json)}`);
       if ("entities_text" in json.response) {
         const offers: [KentoEntity] = JSON.parse(json.response.entities_text);
         console.log(
@@ -182,9 +214,6 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
       console.log("error", error);
     }
   };
-
-  // Environment variables
-  const { devEnvironment } = useContext(LoginContext);
 
   // Variables
   const [offers, setOffers] = useState<KentoEntity[]>([]);
@@ -200,20 +229,6 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
           index={1}
           snapPoints={snapPoints}
         >
-          {/* <Pressable
-            style={({ pressed }) => [
-              {
-                opacity: pressed ? 0.6 : 1.0,
-              },
-              { alignItems: "flex-end", marginRight: "5%" },
-            ]}
-            onPress={() => {
-              handleCloseModalPress();
-            }}
-          >
-            <AntDesign name="close" size={24} color="black" />
-          </Pressable> */}
-
           {selectedUserIndex != -1 ? (
             <>
               <Pressable
@@ -289,7 +304,10 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
                     },
                     enrichedUsers[selectedUserIndex].kentoEntities.filter(
                       (item: KentoEntity) => item.isSelect
-                    ).length > 0
+                    ).length +
+                      offers.filter((item: KentoEntity) => item.isSelect)
+                        .length >
+                    0
                       ? scanStyles.pinkButton
                       : scanStyles.greyButton,
                   ]}
@@ -300,7 +318,10 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
                   <Text style={sharedStyles.textPinkButton}>
                     {enrichedUsers[selectedUserIndex].kentoEntities.filter(
                       (item: KentoEntity) => item.isSelect
-                    ).length > 0
+                    ).length +
+                      offers.filter((item: KentoEntity) => item.isSelect)
+                        .length >
+                    0
                       ? "Validate"
                       : `Select pass to validate`}
                   </Text>

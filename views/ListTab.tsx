@@ -136,7 +136,7 @@ export const ListTab = ({ route }) => {
         )}
         keyExtractor={(item) => item._id}
       />
-      <ScanBottomSheet ref={ref}></ScanBottomSheet>
+      <ScanBottomSheet route={route} ref={ref}></ScanBottomSheet>
     </View>
   );
 };
