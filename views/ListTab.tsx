@@ -31,12 +31,13 @@ export const ListTab = ({ route }) => {
   // Components
   type EnrichedUserItemProps = {
     enrichedUser: EnrichedUser;
-    index: number;
   };
-  const EnrichedUserItem = ({ enrichedUser, index }: EnrichedUserItemProps) => (
+  const EnrichedUserItem = ({ enrichedUser }: EnrichedUserItemProps) => (
     <TouchableOpacity
       onPress={() => {
-        setSelectedUserIndex(index);
+        setSelectedUserIndex(
+          enrichedUsers.findIndex((user) => user.email === enrichedUser.email)
+        );
         handleCallFunction();
       }}
     >
@@ -131,9 +132,7 @@ export const ListTab = ({ route }) => {
               .toLowerCase()
               .includes(searchParticipantText.toLowerCase())
         )}
-        renderItem={({ item, index }) => (
-          <EnrichedUserItem enrichedUser={item} index={index} />
-        )}
+        renderItem={({ item }) => <EnrichedUserItem enrichedUser={item} />}
         keyExtractor={(item) => item._id}
       />
       <ScanBottomSheet route={route} ref={ref}></ScanBottomSheet>

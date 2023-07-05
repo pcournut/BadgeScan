@@ -44,8 +44,8 @@ export interface Authentication {
 
 export interface User {
     _id: string
-    first_name: string
-    last_name: string
+    first_name?: string
+    last_name?: string
     authentication?: Authentication
     email?: string
 }

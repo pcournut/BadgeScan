@@ -118,8 +118,14 @@ export const ScanScreen = ({ navigation, route }) => {
               };
               const enrichedUser: EnrichedUser = {
                 // _id: updatedEntity.owner._id,
-                first_name: updatedEntity.owner.first_name,
-                last_name: updatedEntity.owner.last_name,
+                first_name:
+                  "first_name" in updatedEntity.owner
+                    ? updatedEntity.owner.first_name
+                    : updatedEntity.owner.email,
+                last_name:
+                  "last_name" in updatedEntity.owner
+                    ? updatedEntity.owner.last_name
+                    : "",
                 email: updatedEntity.owner.email,
                 kentoEntities: [kentoEntity],
               };
