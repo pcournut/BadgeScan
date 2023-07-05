@@ -25,7 +25,6 @@ export const ConfigureScreen = ({ navigation, route }) => {
       redirect: "follow",
     };
 
-    console.log(route.params.devEnvironment);
     try {
       const response = await fetch(
         `${
@@ -34,7 +33,7 @@ export const ConfigureScreen = ({ navigation, route }) => {
         requestOptions
       );
       const json = await response.json();
-      console.log(json);
+      // console.log(json);
       if ("events_text" in json.response) {
         setEvents(JSON.parse(json.response.events_text));
       }
@@ -63,6 +62,8 @@ export const ConfigureScreen = ({ navigation, route }) => {
       redirect: "follow",
     };
 
+    console.log(`cursor: ${cursor}`);
+
     try {
       const kentoEntityResponse = await fetch(
         `${
@@ -73,7 +74,7 @@ export const ConfigureScreen = ({ navigation, route }) => {
         requestOptions
       );
       const kentoEntityJSON = await kentoEntityResponse.json();
-      console.log(`kentoEntityJSON : ${JSON.stringify(kentoEntityJSON)}`);
+      // console.log(`kentoEntityJSON : ${JSON.stringify(kentoEntityJSON)}`);
       if (
         "results" in kentoEntityJSON.response &&
         kentoEntityJSON.response.results.length > 0
@@ -83,19 +84,19 @@ export const ConfigureScreen = ({ navigation, route }) => {
         const userResponse = await fetch(
           `${
             route.params.devEnvironment ? devEndpoint : prodEndpoint
-          }/obj/User?api_token=${token}&cursor=${cursor}&constraints=[{ "key": "_id", "constraint_type": "in", "value": [${kentoEntities
+          }/obj/User?api_token=${token}&constraints=[{ "key": "_id", "constraint_type": "in", "value": [${kentoEntities
             .filter((item: KentoEntity) => item.owner !== undefined)
             .map(({ owner }) => '"' + owner + '"')}]}]`,
           requestOptions
         );
         // console.log(`response ${await userResponse.text()}`);
         const userJSON = await userResponse.json();
-        console.log(`usersJSON: ${JSON.stringify(userJSON)}`);
         if (
           "results" in userJSON.response &&
           userJSON.response.results.length > 0
         ) {
           const users: [User] = userJSON.response.results;
+          console.log(`users: ${users.length}`);
           var enrichedUsers: EnrichedUser[] = [];
           for (const kentoEntity of kentoEntities) {
             kentoEntity.isUsed =
@@ -142,6 +143,8 @@ export const ConfigureScreen = ({ navigation, route }) => {
           }
 
           return enrichedUsers;
+        } else {
+          console.log(`usersJSON: ${JSON.stringify(userJSON)}`);
         }
       }
     } catch (error) {
