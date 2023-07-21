@@ -10,6 +10,7 @@ import { ScanScreen } from "./views/ScanScreen";
 
 const App = () => {
   // Components
+  //TEST
   const Stack = createStackNavigator();
 
   const LogoTitle = (props: any) => {
