@@ -25,86 +25,90 @@ export const ScanScreen = ({ navigation, route }) => {
   const [lastQueryUnixTimeStamp, setLastQueryUnixTimeStamp] = useState<number>(
     Date.now()
   );
+  const [failedKentoEntities, setFailedKentoEntities] = useState<string[]>([]);
 
   // Functions
-  const participantListUpdate = async (
-    kentoEntityIds: string[],
-    token: string,
-    accesses: [Access],
-    scanTerminal: string
-  ) => {
-    var myHeaders = new Headers();
-    myHeaders.append("Authorization", `Bearer ${token}`);
+const participantListUpdate = async (
+  kentoEntityIds: string[],
+  token: string,
+  accesses: [Access],
+  scanTerminal: string
+) => {
+  const TIMEOUT = 25000; // Set your timeout value
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), TIMEOUT);
 
-    var formdata = new FormData();
-    formdata.append(
-      "scanned_entities",
-      `[${kentoEntityIds.map((item) => '"' + item + '"')}]`
-    );
-    formdata.append("scan_terminal", `${scanTerminal}`);
-    formdata.append(
-      "accesses",
-      `[${accesses.map(({ _id }) => '"' + _id + '"')}]`
-    );
-    formdata.append(
-      "last_query_unix_timestamp",
-      `${lastQueryUnixTimeStamp.toString()}`
-    );
-    // console.log(`formdata: ${JSON.stringify(formdata)}`);
+  var myHeaders = new Headers();
+  myHeaders.append("Authorization", `Bearer ${token}`);
 
-    var requestOptions: RequestInit = {
-      method: "POST",
-      headers: myHeaders,
-      body: formdata,
-      redirect: "follow",
-    };
+  var formdata = new FormData();
+  formdata.append(
+    "scanned_entities",
+    `[${kentoEntityIds.map((item) => '"' + item + '"')}]`
+  );
+  formdata.append("scan_terminal", `${scanTerminal}`);
+  formdata.append(
+    "accesses",
+    `[${accesses.map(({ _id }) => '"' + _id + '"')}]`
+  );
+  formdata.append(
+    "last_query_unix_timestamp",
+    `${lastQueryUnixTimeStamp.toString()}`
+  );
 
-    try {
-      const response = await fetch(
-        `${
-          route.params.devEnvironment ? devEndpoint : prodEndpoint
-        }/wf/participant-list-update`,
-        requestOptions
+  var requestOptions: RequestInit = {
+    method: "POST",
+    headers: myHeaders,
+    body: formdata,
+    redirect: "follow",
+  };
+
+  try {
+    const response = await fetch(
+      `${route.params.devEnvironment ? devEndpoint : prodEndpoint}/wf/participant-list-update`,
+      { signal: controller.signal, ...requestOptions }
+    )
+    .catch((e) => {
+      if (e.name === 'AbortError') {
+        // If the request times out, add the entityIds to the failed list
+        setFailedKentoEntities([...failedKentoEntities, ...kentoEntityIds]);
+        throw new Error('Request timed out');
+      }
+  
+      throw e;
+    })
+    .finally(() => clearTimeout(id));
+  
+    if (!response.ok) {
+      // If server response is not ok, add the entityIds to the failed list
+      setFailedKentoEntities([...failedKentoEntities, ...kentoEntityIds]);
+      throw new Error('Server response was not ok');
+    }
+
+    const json = await response.json();
+    var newEnrichedUsers: EnrichedUser[] = Object.assign([], enrichedUsers);
+    if ("updated_entities_text" in json.response) {
+      const updatedEntities: [UpdatedEntity] = JSON.parse(
+        json.response.updated_entities_text
       );
-      // console.log(`response ${JSON.stringify(response)}`);
-      const json = await response.json();
-      var newEnrichedUsers: EnrichedUser[] = Object.assign([], enrichedUsers);
-      if ("updated_entities_text" in json.response) {
-        const updatedEntities: [UpdatedEntity] = JSON.parse(
-          json.response.updated_entities_text
-        );
-        console.log(`Number of updated entities: ${updatedEntities.length}`);
-        if (updatedEntities.length > 0) {
-          console.log(JSON.stringify(updatedEntities));
-          for (const updatedEntity of updatedEntities) {
-            const userIndex = enrichedUsers.findIndex(
-              // (item: EnrichedUser) => item._id === updatedEntity.owner._id
-              (item: EnrichedUser) => item.email === updatedEntity.owner.email
+      console.log(`Number of updated entities: ${updatedEntities.length}`);
+      if (updatedEntities.length > 0) {
+        console.log(JSON.stringify(updatedEntities));
+        for (const updatedEntity of updatedEntities) {
+          const userIndex = enrichedUsers.findIndex(
+            // (item: EnrichedUser) => item._id === updatedEntity.owner._id
+            (item: EnrichedUser) => item.email === updatedEntity.owner.email
+          );
+          if (userIndex !== -1) {
+            const kentoEntityIndex = enrichedUsers[
+              userIndex
+            ].kentoEntities.findIndex(
+              (item: KentoEntity) => item._id === updatedEntity._id
             );
-            if (userIndex !== -1) {
-              const kentoEntityIndex = enrichedUsers[
-                userIndex
-              ].kentoEntities.findIndex(
-                (item: KentoEntity) => item._id === updatedEntity._id
-              );
-              if (kentoEntityIndex !== -1) {
-                newEnrichedUsers[userIndex].kentoEntities[
-                  kentoEntityIndex
-                ].isUsed = updatedEntity.scan_terminal !== undefined;
-              } else {
-                const kentoEntity: KentoEntity = {
-                  _id: updatedEntity._id,
-                  access: updatedEntity.access,
-                  owner: updatedEntity.owner._id,
-                  owner_email: updatedEntity.owner.email,
-                  scan_terminal: updatedEntity.scan_terminal,
-                  isUsed:
-                    updatedEntity.scan_terminal !== undefined &&
-                    updatedEntity.scan_terminal !== undefined &&
-                    updatedEntity.scan_terminal.length > 0,
-                };
-                newEnrichedUsers[userIndex].kentoEntities.push(kentoEntity);
-              }
+            if (kentoEntityIndex !== -1) {
+              newEnrichedUsers[userIndex].kentoEntities[
+                kentoEntityIndex
+              ].isUsed = updatedEntity.scan_terminal !== undefined;
             } else {
               const kentoEntity: KentoEntity = {
                 _id: updatedEntity._id,
@@ -116,34 +120,47 @@ export const ScanScreen = ({ navigation, route }) => {
                   updatedEntity.scan_terminal !== undefined &&
                   updatedEntity.scan_terminal.length > 0,
               };
-              const enrichedUser: EnrichedUser = {
-                // _id: updatedEntity.owner._id,
-                first_name:
-                  "first_name" in updatedEntity.owner
-                    ? updatedEntity.owner.first_name
-                    : updatedEntity.owner.email,
-                last_name:
-                  "last_name" in updatedEntity.owner
-                    ? updatedEntity.owner.last_name
-                    : "",
-                email: updatedEntity.owner.email,
-                kentoEntities: [kentoEntity],
-              };
-              newEnrichedUsers.push(enrichedUser);
+              newEnrichedUsers[userIndex].kentoEntities.push(kentoEntity);
             }
+          } else {
+            const kentoEntity: KentoEntity = {
+              _id: updatedEntity._id,
+              access: updatedEntity.access,
+              owner: updatedEntity.owner._id,
+              owner_email: updatedEntity.owner.email,
+              scan_terminal: updatedEntity.scan_terminal,
+              isUsed:
+                updatedEntity.scan_terminal !== undefined &&
+                updatedEntity.scan_terminal.length > 0,
+            };
+            const enrichedUser: EnrichedUser = {
+              // _id: updatedEntity.owner._id,
+              first_name:
+                "first_name" in updatedEntity.owner
+                  ? updatedEntity.owner.first_name
+                  : updatedEntity.owner.email,
+              last_name:
+                "last_name" in updatedEntity.owner
+                  ? updatedEntity.owner.last_name
+                  : "",
+              email: updatedEntity.owner.email,
+              kentoEntities: [kentoEntity],
+            };
+            newEnrichedUsers.push(enrichedUser);
           }
         }
-      } else {
-        console.log(`Empty updated entities.`);
       }
-      setEnrichedUsers(newEnrichedUsers);
-      // TODO: update with date from workflow answer when available
-      setLastQueryUnixTimeStamp(json.response.last_query_unix_timestamp);
-      console.log("Updated with server.");
-    } catch (error) {
-      console.log("error", error);
-    }
-  };
+    } else {
+      console.log(`Empty updated entities.`);
+    }               
+    setEnrichedUsers(newEnrichedUsers);
+    // When a response is successful, remove the corresponding entityIds from the failed list
+    setFailedKentoEntities(failedKentoEntities.filter(id => !kentoEntityIds.includes(id)));
+  } catch (error) {
+    console.log("error", error);
+  }
+};
+
 
   // Server update
   useEffect(() => {
@@ -158,14 +175,14 @@ export const ScanScreen = ({ navigation, route }) => {
         }
       }
       participantListUpdate(
-        changedKentoEntities,
+        [...failedKentoEntities, ...changedKentoEntities],
         route.params.token,
         route.params.accesses,
         route.params.scanTerminal
       );
-    }, 5000);
+    }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [failedKentoEntities]);
 
   return (
     <ScanScreenContext.Provider
