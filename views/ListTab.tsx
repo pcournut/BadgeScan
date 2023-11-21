@@ -31,12 +31,13 @@ export const ListTab = ({ route }) => {
   // Components
   type EnrichedUserItemProps = {
     enrichedUser: EnrichedUser;
-    index: number;
   };
-  const EnrichedUserItem = ({ enrichedUser, index }: EnrichedUserItemProps) => (
+  const EnrichedUserItem = ({ enrichedUser }: EnrichedUserItemProps) => (
     <TouchableOpacity
       onPress={() => {
-        setSelectedUserIndex(index);
+        setSelectedUserIndex(
+          enrichedUsers.findIndex((user) => user.email === enrichedUser.email)
+        );
         handleCallFunction();
       }}
     >
@@ -54,23 +55,23 @@ export const ListTab = ({ route }) => {
         </Text>
         <Text style={scanStyles.blackText}>
           {
-            enrichedUser.badgeEntities.filter(
-              (badgeEntity) => badgeEntity.isUsed
+            enrichedUser.kentoEntities.filter(
+              (kentoEntity) => kentoEntity.isUsed
             ).length
           }{" "}
-          / {enrichedUser.badgeEntities.length}
+          / {enrichedUser.kentoEntities.length}
           {"  "}
           <Icon
             name="circle"
             size={15}
             color={
-              enrichedUser.badgeEntities.filter(
-                (badgeEntity) => badgeEntity.isUsed
+              enrichedUser.kentoEntities.filter(
+                (kentoEntity) => kentoEntity.isUsed
               ).length == 0
                 ? "white"
-                : enrichedUser.badgeEntities.filter(
-                    (badgeEntity) => badgeEntity.isUsed
-                  ).length == enrichedUser.badgeEntities.length
+                : enrichedUser.kentoEntities.filter(
+                    (kentoEntity) => kentoEntity.isUsed
+                  ).length == enrichedUser.kentoEntities.length
                 ? "green"
                 : "orange"
             }
@@ -90,16 +91,25 @@ export const ListTab = ({ route }) => {
       <Text style={scanStyles.boldBlackText}>
         {enrichedUsers
           .map(
-            ({ badgeEntities }) =>
-              badgeEntities.filter((badgeEntity) => {
-                if (badgeEntity.isUsed) {
+            ({ kentoEntities }) =>
+              kentoEntities.filter((kentoEntity) => {
+                if (kentoEntity.isUsed) {
                   return true;
                 }
                 return false;
               }).length
           )
           .reduce((a, b) => a + b, 0)}
-        / {route.params.nBadgeEntities} kentos scanned
+        /
+        {enrichedUsers
+          .map((enrichedUser) => enrichedUser.kentoEntities.length)
+          .reduce((a, b) => a + b)}{" "}
+        {enrichedUsers
+          .map((enrichedUser) => enrichedUser.kentoEntities.length)
+          .reduce((a, b) => a + b) > 1
+          ? "passes"
+          : "pass"}{" "}
+        scanned
       </Text>
       <TextInput
         value={searchParticipantText}
@@ -122,12 +132,10 @@ export const ListTab = ({ route }) => {
               .toLowerCase()
               .includes(searchParticipantText.toLowerCase())
         )}
-        renderItem={({ item, index }) => (
-          <EnrichedUserItem enrichedUser={item} index={index} />
-        )}
+        renderItem={({ item }) => <EnrichedUserItem enrichedUser={item} />}
         keyExtractor={(item) => item._id}
       />
-      <ScanBottomSheet ref={ref}></ScanBottomSheet>
+      <ScanBottomSheet route={route} ref={ref}></ScanBottomSheet>
     </View>
   );
 };

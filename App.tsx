@@ -8,33 +8,41 @@ import { ConfigureScreen } from "./views/ConfigureScreen";
 import { LoginScreen } from "./views/LoginScreen";
 import { ScanScreen } from "./views/ScanScreen";
 
-const Stack = createStackNavigator();
-
-const LogoTitle = (props: any) => {
-  return (
-    <View>
-      <Image
-        style={{ width: 120, height: 20 }}
-        source={require("./assets/kento-text.jpg")}
-        resizeMode="cover"
-      />
-    </View>
-  );
-};
-
-const MyCustomHeaderBackImage = () => (
-  <Feather name="arrow-left" size={30} color={Colors.PINK} />
-);
-
 const App = () => {
+  // Components
+  //TEST
+  const Stack = createStackNavigator();
+
+  const LogoTitle = (props: any) => {
+    return (
+      <View>
+        <Image
+          style={{
+            width: 100,
+            height: "100%",
+          }}
+          source={require("./assets/kento-text-rose.jpg")}
+          resizeMode="cover"
+        />
+      </View>
+    );
+  };
+
+  const MyCustomHeaderBackImage = () => (
+    <Feather
+      style={{ marginLeft: "8%" }}
+      name="arrow-left"
+      size={30}
+      color={Colors.PINK}
+    />
+  );
+
   return (
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={({ route, navigation }) => ({
           headerBackImage: MyCustomHeaderBackImage,
           headerBackTitleVisible: false,
-          // header: <MyHeader></MyHeader>,
-          // headerStyle: {marginRight: "2%", marginLeft: "2%"},
           headerTitle: (props) => <LogoTitle {...props} />,
           headerRight: () => (
             <Pressable
@@ -42,6 +50,7 @@ const App = () => {
               style={({ pressed }) => [
                 {
                   opacity: pressed ? 0.6 : 1.0,
+                  marginRight: "8%",
                 },
               ]}
             >

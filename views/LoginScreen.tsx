@@ -1,21 +1,27 @@
-import { useRef, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { useState } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  TextInput,
+  Switch,
+  SafeAreaView,
+} from "react-native";
 import sharedStyles from "../styles/shared";
 import loginStyles from "../styles/login";
-import PhoneInput from "react-native-phone-number-input";
 import {
   CodeField,
   Cursor,
   useBlurOnFulfill,
   useClearByFocusCell,
 } from "react-native-confirmation-code-field";
+import { devEndpoint, prodEndpoint } from "../constants";
 
 export const LoginScreen = ({ navigation }) => {
   // Functions
-  const sendCode = async (phoneCountryCode: string, phoneNumber: string) => {
+  const sendCode = async (email: string) => {
     var formdata = new FormData();
-    formdata.append("phoneNumber", phoneNumber);
-    formdata.append("phoneCountryCode", phoneCountryCode);
+    formdata.append("email", email);
 
     var requestOptions: RequestInit = {
       method: "POST",
@@ -25,7 +31,7 @@ export const LoginScreen = ({ navigation }) => {
 
     try {
       const response = await fetch(
-        "https://club-soda-test-pierre.bubbleapps.io/version-test/api/1.1/wf/PasswordlessSendCode",
+        `${devEnvironment ? devEndpoint : prodEndpoint}/wf/login-email-otp`,
         requestOptions
       );
       const result = await response.text();
@@ -35,15 +41,10 @@ export const LoginScreen = ({ navigation }) => {
     }
   };
 
-  const verifyCode = async (
-    phoneCountryCode: string,
-    phoneNumber: string,
-    twilioCode: string
-  ) => {
+  const verifyCode = async (email: string, code: string) => {
     var formdata = new FormData();
-    formdata.append("phoneNumber", phoneNumber);
-    formdata.append("code", twilioCode);
-    formdata.append("phoneCountryCode", phoneCountryCode);
+    formdata.append("email", email);
+    formdata.append("OTP", code);
 
     var requestOptions: RequestInit = {
       method: "POST",
@@ -51,26 +52,28 @@ export const LoginScreen = ({ navigation }) => {
       redirect: "follow",
     };
 
+    console.log(JSON.stringify(formdata));
+
     try {
       const response = await fetch(
-        "https://club-soda-test-pierre.bubbleapps.io/version-test/api/1.1/wf/PasswordlessVerifyCode",
+        `${devEnvironment ? devEndpoint : prodEndpoint}/wf/login`,
         requestOptions
       );
       const json = await response.json();
       console.log(json);
       navigation.navigate("Configure", {
-        userFirstName: json.response.userFirstName,
+        user_id: json.response.user_id,
         token: json.response.token,
+        devEnvironment: devEnvironment,
       });
     } catch (error) {
       console.log("error", error);
     }
   };
 
-  const devConnect = async (phoneCountryCode: string, phoneNumber: string) => {
+  const devConnect = async (email: string) => {
     var formdata = new FormData();
-    formdata.append("phoneNumber", phoneNumber);
-    formdata.append("phoneCountryCode", phoneCountryCode);
+    formdata.append("email", email);
 
     var requestOptions: RequestInit = {
       method: "POST",
@@ -80,26 +83,33 @@ export const LoginScreen = ({ navigation }) => {
 
     try {
       const response = await fetch(
-        "https://club-soda-test-pierre.bubbleapps.io/version-test/api/1.1/wf/PasswordlessVerifyCodeNOTWILIO",
+        `${devEnvironment ? devEndpoint : prodEndpoint}/wf/admin-login`,
         requestOptions
       );
       const json = await response.json();
       console.log(json);
       navigation.navigate("Configure", {
-        userFirstName: json.response.userFirstName,
+        user_id: json.response.user_id,
         token: json.response.token,
+        devEnvironment: devEnvironment,
       });
     } catch (error) {
       console.log("error", error);
     }
+  };
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+    return emailRegex.test(email);
   };
 
   // State variables
-  const [phoneNumber, setPhoneNumber] = useState("674670066");
-  const [formattedPhoneNumber, setFormattedPhoneNumber] = useState("");
-  const phoneInput = useRef<PhoneInput>(null);
+  // -- email
+  const [email, setEmail] = useState("pierre.cournut@gmail.com");
+  const [emailIsValid, setEmailIsValid] = useState(true);
+  // -- UI states
   const [showCode, setShowCode] = useState(false);
-
+  // -- code
   const CELL_COUNT = 4;
   const [value, setValue] = useState("");
   const ref = useBlurOnFulfill({ value, cellCount: CELL_COUNT });
@@ -108,120 +118,116 @@ export const LoginScreen = ({ navigation }) => {
     setValue,
   });
 
+  // Environment variables
+  const [devEnvironment, setDevEnvironment] = useState(true);
+  const toggleSwitch = () => setDevEnvironment(!devEnvironment);
+
   return (
-    <View style={sharedStyles.container}>
-      <PhoneInput
-        ref={phoneInput}
-        defaultValue={phoneNumber}
-        defaultCode="FR"
-        layout="first"
-        onChangeText={(text) => {
-          setPhoneNumber(text);
-        }}
-        onChangeFormattedText={(text) => {
-          setFormattedPhoneNumber(text);
-        }}
-        withDarkTheme
-        withShadow
-        autoFocus
+    <SafeAreaView style={{ flex: 1 }}>
+      <Text>Environment: {devEnvironment ? "dev" : "prod"}</Text>
+      <Switch
+        trackColor={{ false: "#767577", true: "#81b0ff" }}
+        thumbColor={devEnvironment ? "#f5dd4b" : "#f4f3f4"}
+        ios_backgroundColor="#3e3e3e"
+        onValueChange={toggleSwitch}
+        value={devEnvironment}
       />
-      {phoneInput.current?.isValidNumber(phoneNumber) && (
-        <>
-          <Pressable
-            style={({ pressed }) => [
-              {
-                opacity: pressed ? 0.6 : 1.0,
-              },
-              sharedStyles.pinkButton,
-            ]}
-            onPress={() => {
-              sendCode(`+${phoneInput.current?.getCallingCode()}`, phoneNumber);
-              setShowCode(true);
-            }}
-          >
-            <Text style={sharedStyles.textPinkButton}>Receive SMS</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              {
-                opacity: pressed ? 0.6 : 1.0,
-              },
-              sharedStyles.pinkButton,
-            ]}
-            onPress={() => {
-              devConnect(
-                `+${phoneInput.current?.getCallingCode()}`,
-                phoneNumber
-              );
-            }}
-          >
-            <Text style={sharedStyles.textPinkButton}>No Twilio connect</Text>
-          </Pressable>
-        </>
-      )}
-      {showCode && (
-        <CodeField
-          ref={ref}
-          {...props}
-          // Use `caretHidden={false}` when users can't paste a text value, because context menu doesn't appear
-          value={value}
-          onChangeText={setValue}
-          cellCount={CELL_COUNT}
-          rootStyle={loginStyles.codeFieldRoot}
-          keyboardType="number-pad"
-          textContentType="oneTimeCode"
-          renderCell={({ index, symbol, isFocused }) => (
-            <Text
-              key={index}
-              style={[loginStyles.cell, isFocused && loginStyles.focusCell]}
-              onLayout={getCellOnLayoutHandler(index)}
-            >
-              {symbol || (isFocused ? <Cursor /> : null)}
-            </Text>
-          )}
+      <View style={sharedStyles.container}>
+        <TextInput
+          value={email}
+          onChangeText={(email) => setEmail(email)}
+          placeholder="Enter email"
+          style={loginStyles.textInput}
         />
-      )}
-      {value.length == CELL_COUNT && (
-        <Pressable
-          style={({ pressed }) => [
-            {
-              opacity: pressed ? 0.6 : 1.0,
-            },
-            sharedStyles.pinkButton,
-          ]}
-          onPress={() => {
-            verifyCode(
-              `+${phoneInput.current?.getCallingCode()}`,
-              phoneNumber,
-              value
-            );
-          }}
-        >
-          <Text style={sharedStyles.textPinkButton}>Confirm</Text>
-        </Pressable>
-      )}
-      {showCode && (
-        <>
-          <View style={sharedStyles.containerRow}>
-            <Text style={loginStyles.greyText}>Did not receive?</Text>
+
+        {validateEmail(email) && (
+          <>
             <Pressable
               style={({ pressed }) => [
                 {
                   opacity: pressed ? 0.6 : 1.0,
                 },
+                sharedStyles.pinkButton,
               ]}
               onPress={() => {
-                sendCode(
-                  `+${phoneInput.current?.getCallingCode()}`,
-                  phoneNumber
-                );
+                sendCode(email);
+                setShowCode(true);
               }}
             >
-              <Text style={loginStyles.pinkText}>Resend code</Text>
+              <Text style={sharedStyles.textPinkButton}>Send code</Text>
             </Pressable>
-          </View>
-        </>
-      )}
-    </View>
+            <Pressable
+              style={({ pressed }) => [
+                {
+                  opacity: pressed ? 0.6 : 1.0,
+                },
+                sharedStyles.pinkButton,
+              ]}
+              onPress={() => {
+                devConnect(email);
+              }}
+            >
+              <Text style={sharedStyles.textPinkButton}>Dev connect</Text>
+            </Pressable>
+          </>
+        )}
+        {showCode && (
+          <CodeField
+            ref={ref}
+            {...props}
+            // Use `caretHidden={false}` when users can't paste a text value, because context menu doesn't appear
+            value={value}
+            onChangeText={setValue}
+            cellCount={CELL_COUNT}
+            rootStyle={loginStyles.codeFieldRoot}
+            keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            renderCell={({ index, symbol, isFocused }) => (
+              <Text
+                key={index}
+                style={[loginStyles.cell, isFocused && loginStyles.focusCell]}
+                onLayout={getCellOnLayoutHandler(index)}
+              >
+                {symbol || (isFocused ? <Cursor /> : null)}
+              </Text>
+            )}
+          />
+        )}
+        {value.length == CELL_COUNT && (
+          <Pressable
+            style={({ pressed }) => [
+              {
+                opacity: pressed ? 0.6 : 1.0,
+              },
+              sharedStyles.pinkButton,
+            ]}
+            onPress={() => {
+              verifyCode(email, value);
+            }}
+          >
+            <Text style={sharedStyles.textPinkButton}>Confirm</Text>
+          </Pressable>
+        )}
+        {showCode && (
+          <>
+            <View style={sharedStyles.containerRow}>
+              <Text style={loginStyles.greyText}>Did not receive?</Text>
+              <Pressable
+                style={({ pressed }) => [
+                  {
+                    opacity: pressed ? 0.6 : 1.0,
+                  },
+                ]}
+                onPress={() => {
+                  sendCode(email);
+                }}
+              >
+                <Text style={loginStyles.pinkText}>Resend code</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </View>
+    </SafeAreaView>
   );
 };

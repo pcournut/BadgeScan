@@ -9,68 +9,48 @@ import {
 } from "react-native";
 import sharedStyles from "../styles/shared";
 import configureStyles from "../styles/configure";
-import { Org, Event, Badge, BadgeEntity, User, EnrichedUser } from "../types";
+import { Event, Access, KentoEntity, User, EnrichedUser } from "../types";
 import { Feather } from "@expo/vector-icons";
+import { devEndpoint, prodEndpoint } from "../constants";
 
 export const ConfigureScreen = ({ navigation, route }) => {
   // Functions
-  const eventInit = async (token: string, orgId?: string, eventId?: string) => {
+  const scannerInit = async (token: string) => {
     var myHeaders = new Headers();
     myHeaders.append("Authorization", `Bearer ${token}`);
 
-    var formdata = new FormData();
-    if (orgId != null) {
-      formdata.append("orgId", orgId);
-    }
-    if (eventId != null) {
-      formdata.append("eventId", eventId);
-    }
-    console.log(`formdata ${formdata}`);
-
     var requestOptions: RequestInit = {
-      method: "POST",
+      method: "GET",
       headers: myHeaders,
-      body: formdata,
       redirect: "follow",
     };
 
     try {
       const response = await fetch(
-        "https://club-soda-test-pierre.bubbleapps.io/version-test/api/1.1/wf/KentoEventInit",
+        `${
+          route.params.devEnvironment ? devEndpoint : prodEndpoint
+        }/wf/scanner-init`,
         requestOptions
       );
       const json = await response.json();
-      console.log(json);
-      if ("orgs" in json.response && json.response.orgs.length > 0) {
-        setOrgs(json.response.orgs);
+      // console.log(json);
+      if ("events_text" in json.response) {
+        setEvents(JSON.parse(json.response.events_text));
       }
-      if ("events" in json.response && json.response.events.length > 0) {
-        setEvents(json.response.events);
+      if ("accesses_text" in json.response) {
+        setAccesses(JSON.parse(json.response.accesses_text));
       }
-      if ("badges" in json.response && json.response.badges.length > 0) {
-        const badges: [Badge] = json.response.badges;
-        setBadges(
-          badges.map((badge) => {
-            badge.max_supply =
-              badge.max_supply !== undefined
-                ? badge.max_supply
-                : badge.rollup_maxEntities;
-            badge.isSelect = false;
-            return badge;
-          })
-        );
-      }
-      if ("scanTerminal" in json.response) {
-        setScanTerminal(json.response.scanTerminal);
+      if ("scanner_terminal_id" in json.response) {
+        setScanTerminal(json.response.scanner_terminal_id);
       }
     } catch (error) {
       console.log("error", error);
     }
   };
 
-  const unitSelectBadgesCall = async (
+  const unitSelectAccessesCall = async (
     token: String,
-    badges: Badge[],
+    accesses: Access[],
     cursor: number
   ) => {
     var myHeaders = new Headers();
@@ -82,23 +62,31 @@ export const ConfigureScreen = ({ navigation, route }) => {
       redirect: "follow",
     };
 
+    console.log(`cursor: ${cursor}`);
+
     try {
-      const badgeEntityResponse = await fetch(
-        `https://kento.events/version-test/api/1.1/obj/BadgeEntity?api_token=d86b5a64e3e852fa606cc7553e7257b2&constraints=[{ "key": "parent_badge","constraint_type":"in","value":[${badges.map(
+      const kentoEntityResponse = await fetch(
+        `${
+          route.params.devEnvironment ? devEndpoint : prodEndpoint
+        }/obj/KentoEntity?cursor=${cursor}&api_token=${token}&constraints=[{ "key": "access","constraint_type":"in","value":[${accesses.map(
           ({ _id }) => '"' + _id + '"'
-        )}]}]&cursor=${cursor}`,
+        )}]},{ "key": "status","constraint_type":"equals","value":"confirmed"}]`,
         requestOptions
       );
-      const badgeEntityJSON = await badgeEntityResponse.json();
+      const kentoEntityJSON = await kentoEntityResponse.json();
+      // console.log(`kentoEntityJSON : ${JSON.stringify(kentoEntityJSON)}`);
       if (
-        "results" in badgeEntityJSON.response &&
-        badgeEntityJSON.response.results.length > 0
+        "results" in kentoEntityJSON.response &&
+        kentoEntityJSON.response.results.length > 0
       ) {
-        const badgeEntities: [BadgeEntity] = badgeEntityJSON.response.results;
+        const kentoEntities: [KentoEntity] = kentoEntityJSON.response.results;
+        console.log(`kentoEntites :${kentoEntities.length}`);
         const userResponse = await fetch(
-          `https://kento.events/version-test/api/1.1/obj/User?api_token=d86b5a64e3e852fa606cc7553e7257b2&constraints=[{ "key": "_id","constraint_type":"in","value":[${badgeEntities.map(
-            ({ owner }) => '"' + owner + '"'
-          )}]}]&cursor=0`,
+          `${
+            route.params.devEnvironment ? devEndpoint : prodEndpoint
+          }/obj/User?api_token=${token}&constraints=[{ "key": "_id", "constraint_type": "in", "value": [${kentoEntities
+            .filter((item: KentoEntity) => item.owner !== undefined)
+            .map(({ owner }) => '"' + owner + '"')}]}]`,
           requestOptions
         );
         // console.log(`response ${await userResponse.text()}`);
@@ -108,36 +96,46 @@ export const ConfigureScreen = ({ navigation, route }) => {
           userJSON.response.results.length > 0
         ) {
           const users: [User] = userJSON.response.results;
+          console.log(`users: ${users.length}`);
           var enrichedUsers: EnrichedUser[] = [];
-          for (const badgeEntity of badgeEntities) {
-            badgeEntity.isUsed = badgeEntity.scan_information !== undefined;
-            badgeEntity.isSelect = false;
-            badgeEntity.toUpdate = false;
-            var badge: Badge = badges.find(
-              (badge) => badge._id === badgeEntity.parent_badge
+          for (const kentoEntity of kentoEntities) {
+            kentoEntity.isUsed =
+              kentoEntity.scan_terminal !== undefined &&
+              kentoEntity.scan_terminal.length > 0;
+            kentoEntity.isSelect = false;
+            kentoEntity.toUpdate = false;
+            var access: Access = accesses.find(
+              (access) => access._id === kentoEntity.access
             );
-            badgeEntity.parentBadgeName = badge.name;
-            badgeEntity.parentBadgeIcon = badge.icon;
+            kentoEntity.access_name = access.name;
+            kentoEntity.access_type = access.kento_type;
             var userIndex = enrichedUsers.findIndex(
-              (user) => user._id === badgeEntity.owner
+              // (user) => user._id === kentoEntity.owner
+              (user) => user.email === kentoEntity.owner_email
             );
             if (userIndex !== -1) {
-              enrichedUsers[userIndex].badgeEntities.push(badgeEntity);
+              enrichedUsers[userIndex].kentoEntities.push(kentoEntity);
             } else {
               var user: User = users.find(
-                (user) => user._id === badgeEntity.owner
+                (user) => user._id === kentoEntity.owner
               );
               if (user === undefined) {
-                // Handle missing owner fields in Bubble (deleted in 03.2023)
-                console.log(`error with badgeEntity: ${badgeEntity._id}`);
+                const enrichedUser: EnrichedUser = {
+                  // In case the user has not registered, his email is his user ID
+                  _id: kentoEntity.owner_email,
+                  email: kentoEntity.owner_email,
+                  first_name: "",
+                  last_name: kentoEntity.owner_email,
+                  kentoEntities: [kentoEntity],
+                };
+                enrichedUsers.push(enrichedUser);
               } else {
                 const enrichedUser: EnrichedUser = {
                   _id: user._id,
                   first_name: user.first_name,
                   last_name: user.last_name,
-                  // Handle empty user emails for search in ListTab
-                  email: user.email == null ? "" : user.email,
-                  badgeEntities: [badgeEntity],
+                  email: user.authentication.email.email,
+                  kentoEntities: [kentoEntity],
                 };
                 enrichedUsers.push(enrichedUser);
               }
@@ -145,6 +143,8 @@ export const ConfigureScreen = ({ navigation, route }) => {
           }
 
           return enrichedUsers;
+        } else {
+          console.log(`usersJSON: ${JSON.stringify(userJSON)}`);
         }
       }
     } catch (error) {
@@ -152,35 +152,39 @@ export const ConfigureScreen = ({ navigation, route }) => {
     }
   };
 
-  const selectBadges = async (token: String, badges: Badge[]) => {
+  const selectAccesses = async (token: String, accesses: Access[]) => {
     // Prepare parallel requests
     const requestNumber: number = Math.ceil(
-      badges.map((badge) => badge.max_supply).reduce((a, b) => a + b) / 100
+      accesses
+        .map((access) => access.confirmed_quantity)
+        .reduce((a, b) => a + b) / 100
     );
 
     try {
       const enrichedUsersList = await Promise.all(
         [...Array(requestNumber).keys()].map((cursor) =>
-          unitSelectBadgesCall(token, badges, 100 * cursor)
+          unitSelectAccessesCall(token, accesses, 100 * cursor)
         )
       );
       const enrichedUsers = enrichedUsersList
         .flat()
         // Handle empty response
         .filter((enrichedUser) => enrichedUser !== undefined);
-      const enrichedUsersBadgeEntitiesNumber: number[] = enrichedUsers.map(
-        (enrichedUser) => enrichedUser.badgeEntities.length
+      const enrichedUsersKentoEntitiesNumber: number[] = enrichedUsers.map(
+        (enrichedUser) => enrichedUser.kentoEntities.length
       );
-      const nBadgeEntites: number = enrichedUsersBadgeEntitiesNumber.reduce(
+      const nKentoEntities: number = enrichedUsersKentoEntitiesNumber.reduce(
         (a, b) => a + b
       );
 
       navigation.navigate("Scan", {
         token: route.params.token,
-        scanTerminal: scanTerminal,
-        badges: badges,
-        nBadgeEntities: nBadgeEntites,
+        accesses: accesses,
+        nKentoEntities: nKentoEntities,
         enrichedUsers: enrichedUsers,
+        scanTerminal: scanTerminal,
+        selectedEvent: selectedEvent._id,
+        devEnvironment: route.params.devEnvironment,
       });
     } catch (error) {
       console.log("error", error);
@@ -188,34 +192,6 @@ export const ConfigureScreen = ({ navigation, route }) => {
   };
 
   // Components
-  type OrgItemProps = {
-    org: Org;
-  };
-  const OrgItem = ({ org }: OrgItemProps) => (
-    <View style={configureStyles.orgContainer}>
-      <Pressable
-        style={({ pressed }) => [
-          {
-            opacity: pressed ? 0.6 : 1.0,
-          },
-        ]}
-        onPress={() => {
-          setEvents([]);
-          setBadges([]);
-          eventInit(route.params.token, org._id);
-        }}
-      >
-        <Text style={sharedStyles.blackText}>{org.name}</Text>
-        <Image
-          style={{ width: 80, height: 80, borderRadius: 80 / 2, marginTop: 10 }}
-          source={{
-            uri: `https:${org.logo}`,
-          }}
-        />
-      </Pressable>
-    </View>
-  );
-
   type EventItemProps = {
     event: Event;
   };
@@ -227,56 +203,17 @@ export const ConfigureScreen = ({ navigation, route }) => {
         },
       ]}
       onPress={() => {
-        eventInit(route.params.token, null, event._id);
+        setSelectedEvent(event);
+        for (const access of accesses) {
+          if (access.isSelect) {
+            selectItem(access);
+          }
+        }
       }}
     >
-      <View style={configureStyles.eventContainer}>
-        <Image
-          style={{
-            width: 60,
-            height: 60,
-            borderRadius: 60 / 2,
-            marginRight: 10,
-          }}
-          source={{
-            uri: `https:${event.main_picture}`,
-          }}
-        />
+      <View style={configureStyles.accessContainer}>
         <Text style={sharedStyles.blackText}>{event.name}</Text>
-      </View>
-    </Pressable>
-  );
-
-  type BadgeItemProps = {
-    badge: Badge;
-  };
-  const BadgeItem = ({ badge }: BadgeItemProps) => (
-    <Pressable
-      style={({ pressed }) => [
-        {
-          opacity: pressed ? 0.6 : 1.0,
-        },
-      ]}
-      onPress={() => {
-        selectItem(badge);
-      }}
-    >
-      <View style={configureStyles.badgeContainer}>
-        <View style={configureStyles.eventContainer}>
-          <Image
-            style={{
-              width: 60,
-              height: 60,
-              borderRadius: 60 / 2,
-              marginRight: 10,
-            }}
-            source={{
-              uri: `https:${badge.icon}`,
-            }}
-          />
-          <Text style={sharedStyles.blackText}>{badge.name}</Text>
-        </View>
-        {badge.isSelect ? (
+        {selectedEvent !== null && event._id === selectedEvent._id ? (
           <Feather name="x-square" size={24} color="black" />
         ) : (
           <Feather name="square" size={24} color="black" />
@@ -285,74 +222,113 @@ export const ConfigureScreen = ({ navigation, route }) => {
     </Pressable>
   );
 
-  const selectItem = (badge: Badge) => {
-    badge.isSelect = !badge.isSelect;
-    var newBadges = Object.assign([], badges);
-    const index = newBadges.findIndex((item) => item._id === badge._id);
-    newBadges[index] = badge;
-    setBadges(newBadges);
+  const imageDict = {
+    Artist: require("../assets/Artist.png"),
+    Community: require("../assets/Community.png"),
+    Guest: require("../assets/Guest.png"),
+    Participant: require("../assets/Participant.png"),
+  };
+  type AccessItemProps = {
+    access: Access;
+  };
+  const AccessItem = ({ access }: AccessItemProps) => (
+    <Pressable
+      style={({ pressed }) => [
+        {
+          opacity: pressed ? 0.6 : 1.0,
+        },
+      ]}
+      onPress={() => {
+        selectItem(access);
+      }}
+    >
+      <View style={configureStyles.accessContainer}>
+        <View style={configureStyles.eventContainer}>
+          <Image
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 60 / 2,
+              marginRight: 10,
+            }}
+            source={imageDict[access.kento_type]}
+          />
+          <Text style={sharedStyles.blackText}>{access.name}</Text>
+        </View>
+        {access.isSelect ? (
+          <Feather name="x-square" size={24} color="black" />
+        ) : (
+          <Feather name="square" size={24} color="black" />
+        )}
+      </View>
+    </Pressable>
+  );
+
+  const selectItem = (access: Access) => {
+    access.isSelect = !access.isSelect;
+    var newAccesses = Object.assign([], accesses);
+    const index = newAccesses.findIndex((item) => item._id === access._id);
+    newAccesses[index] = access;
+    setAccesses(newAccesses);
   };
 
   // State variables
-  const [orgs, setOrgs] = useState<Org[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [badges, setBadges] = useState<Badge[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<Event>(null);
+  const [accesses, setAccesses] = useState<Access[]>([]);
   const [scanTerminal, setScanTerminal] = useState<string>("");
 
   // Init
   useEffect(() => {
-    eventInit(route.params.token);
+    scannerInit(route.params.token);
   }, [navigation]);
 
   return (
     <SafeAreaView style={configureStyles.mainContainer}>
-      <Text style={configureStyles.subtitle}>Select an organisation</Text>
-      <FlatList
-        style={{ flex: 3 }}
-        horizontal={true}
-        data={orgs}
-        renderItem={({ item }) => <OrgItem org={item} />}
-        keyExtractor={(item) => item._id}
-      />
       <Text style={configureStyles.subtitle}>Select an event</Text>
       <FlatList
-        style={{ flex: 3 }}
         data={events}
         renderItem={({ item }) => <EventItem event={item} />}
         keyExtractor={(item) => item._id}
       />
       <Text style={configureStyles.subtitle}>
-        Select the pass you want to scan
+        Select the accesses you want to scan
       </Text>
-      <FlatList
-        style={{ flex: 3 }}
-        data={badges}
-        renderItem={({ item }) => <BadgeItem badge={item} />}
-        keyExtractor={(item) => item._id}
-        extraData={badges}
-      />
-      <View style={{ alignItems: "center", height: "8%", marginBottom: "10%" }}>
-        <Pressable
-          style={({ pressed }) => [
-            {
-              opacity: pressed ? 0.6 : 1.0,
-            },
-            badges.filter((item: Badge) => item.isSelect).length > 0
-              ? configureStyles.pinkButton
-              : configureStyles.greyButton,
-          ]}
-          onPress={() => {
-            if (badges.length > 0) {
-              const selectedBadges: Badge[] = badges.filter(
-                (item: Badge) => item.isSelect
-              );
-              selectBadges(route.params.token, selectedBadges);
-            }
-          }}
-        >
-          <Text style={sharedStyles.textPinkButton}>Start to scan</Text>
-        </Pressable>
-      </View>
+      {selectedEvent != null && (
+        <>
+          <FlatList
+            data={accesses.filter(
+              (item: Access) => item.event === selectedEvent._id
+            )}
+            renderItem={({ item }) => <AccessItem access={item} />}
+            keyExtractor={(item) => item._id}
+          />
+          <View
+            style={{ alignItems: "center", height: "8%", marginBottom: "10%" }}
+          >
+            <Pressable
+              style={({ pressed }) => [
+                {
+                  opacity: pressed ? 0.6 : 1.0,
+                },
+                accesses.filter((item: Access) => item.isSelect).length > 0
+                  ? configureStyles.pinkButton
+                  : configureStyles.greyButton,
+              ]}
+              onPress={() => {
+                if (accesses.length > 0) {
+                  const selectedAccesses: Access[] = accesses.filter(
+                    (item: Access) => item.isSelect
+                  );
+                  selectAccesses(route.params.token, selectedAccesses);
+                }
+              }}
+            >
+              <Text style={sharedStyles.textPinkButton}>Start to scan</Text>
+            </Pressable>
+          </View>
+        </>
+      )}
     </SafeAreaView>
   );
 };

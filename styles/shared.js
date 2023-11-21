@@ -50,14 +50,6 @@ const sharedStyles = StyleSheet.create({
     letterSpacing: 0.25,
     color: "white",
   },
-  badgeItem: {
-    backgroundColor: "#f9c2ff",
-    padding: 20,
-    marginVertical: 8,
-    marginHorizontal: 16,
-    flexDirection: "row",
-  },
-
   button_rne: {
     margin: 10,
   },

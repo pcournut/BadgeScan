@@ -35,6 +35,7 @@ export const CameraTab = ({ route }) => {
   // Functions
   const handleBarCodeScanned = ({ type, data }) => {
     setScanned(true);
+    console.log(data);
     const selectedUserIndex = enrichedUsers.findIndex(
       (item) => item._id === data
     );

@@ -6,9 +6,12 @@ const configureStyles = StyleSheet.create({
     flex: 1,
     width: "90%",
     marginLeft: "5%",
+    marginTop: "5%",
   },
   subtitle: {
-    textAlign: "right",
+    textAlign: "left",
+    marginBottom: 16,
+    marginTop: 16,
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -24,21 +27,16 @@ const configureStyles = StyleSheet.create({
   },
   eventContainer: {
     flexDirection: "row",
-    justifyContent: "left",
+    // justifyContent: "left",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingBottom: 12,
   },
-  badgeContainer: {
+  accessContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingBottom: 12,
-  },
-  badgeItem: {
-    padding: 20,
-    marginVertical: 8,
-    marginHorizontal: 16,
-    flexDirection: "row",
   },
   greyButton: {
     alignItems: "center",

@@ -1,10 +1,10 @@
-import { Button } from "@rneui/themed";
 import React, {
   forwardRef,
   useCallback,
   useContext,
   useMemo,
   useRef,
+  useState,
 } from "react";
 
 import {
@@ -21,17 +21,26 @@ import { AntDesign, Feather } from "@expo/vector-icons";
 import Colors from "../colors";
 import scanStyles from "../styles/scan";
 import sharedStyles from "../styles/shared";
-import { BadgeEntity, EnrichedUser } from "../types";
+import { KentoEntity, EnrichedUser } from "../types";
+import { devEndpoint, prodEndpoint } from "../constants";
 
 type Ref = {
   displayComponent: () => void;
 };
 type Props = {};
 
-export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
+export const ScanBottomSheet = forwardRef<Ref, { route: any }>((props, ref) => {
+  // Access the route prop here
+  const { route } = props;
+
   // Context
-  const { enrichedUsers, setEnrichedUsers, selectedUserIndex } =
-    useContext(ScanScreenContext);
+  const {
+    enrichedUsers,
+    setEnrichedUsers,
+    selectedUserIndex,
+    token,
+    selectedEvent,
+  } = useContext(ScanScreenContext);
 
   // BottomSheetModalProvider params
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
@@ -43,24 +52,35 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
 
   const displayComponent = () => {
     handlePresentModalPress();
+    setOffers([]);
+    setDisplayOffers(false);
   };
   React.useImperativeHandle(ref, () => ({ displayComponent }));
 
   // Components
-  const selectItem = (badgeEntity: BadgeEntity) => {
-    badgeEntity.isSelect = !badgeEntity.isSelect;
+  const selectItem = (KentoEntity: KentoEntity) => {
+    KentoEntity.isSelect = !KentoEntity.isSelect;
     var newEnrichedUsers = Object.assign([], enrichedUsers);
-    const badgeEntityIndex = enrichedUsers[
+    const KentoEntityIndex = enrichedUsers[
       selectedUserIndex
-    ].badgeEntities.findIndex(
-      (item: BadgeEntity) => item._id === badgeEntity._id
+    ].kentoEntities.findIndex(
+      (item: KentoEntity) => item._id === KentoEntity._id
     );
-    newEnrichedUsers[selectedUserIndex][badgeEntityIndex] = badgeEntity;
+    newEnrichedUsers[selectedUserIndex][KentoEntityIndex] = KentoEntity;
     setEnrichedUsers(newEnrichedUsers);
   };
 
-  const BadgeEntityItem = (props: { badgeEntity: BadgeEntity }) => (
-    <View style={scanStyles.badgeEntityContainer}>
+  // TODO: factorize imageDict
+  const imageDict = {
+    Artist: require("../assets/Artist.png"),
+    Community: require("../assets/Community.png"),
+    Guest: require("../assets/Guest.png"),
+    Participant: require("../assets/Participant.png"),
+  };
+  const KentoEntityItem = (props: { kentoEntity: KentoEntity }) => (
+    <View style={scanStyles.kentoEntityContainer}>
+      {props.kentoEntity.price === undefined ||
+        props.kentoEntity.price === "FREE"}
       <Pressable
         style={({ pressed }) => [
           {
@@ -68,36 +88,57 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
           },
         ]}
         onPress={() => {
-          if (!props.badgeEntity.isUsed) {
-            selectItem(props.badgeEntity);
+          if (
+            (props.kentoEntity.price === undefined ||
+              props.kentoEntity.price === "FREE") &&
+            !props.kentoEntity.isUsed
+          ) {
+            selectItem(props.kentoEntity);
           }
         }}
       >
-        {props.badgeEntity.isSelect ? (
-          <Feather name="x-square" size={24} color="black" />
-        ) : (
-          <Feather
-            name="square"
-            size={24}
-            color={props.badgeEntity.isUsed ? "white" : "black"}
-          />
-        )}
-        <Image
+        <View
           style={{
-            width: 60,
-            height: 60,
-            borderRadius: 60 / 2,
-            borderWidth: 1,
-            marginTop: 10,
-            backgroundColor: props.badgeEntity.isUsed ? "grey" : "transparent",
+            borderRadius: 10,
+            backgroundColor: props.kentoEntity.isUsed
+              ? Colors.GREEN
+              : "transparent",
           }}
-          source={{
-            uri: `https:${props.badgeEntity.parentBadgeIcon}`,
-          }}
-        />
-        <Text style={sharedStyles.blackText}>
-          {props.badgeEntity.parentBadgeName}
-        </Text>
+        >
+          {props.kentoEntity.isSelect ? (
+            <Feather name="x-square" size={24} color="black" />
+          ) : props.kentoEntity.isUsed ? (
+            <Text style={{ color: "green", textAlign: "right" }}>
+              validated
+            </Text>
+          ) : props.kentoEntity.price === undefined ||
+            props.kentoEntity.price === "FREE" ? (
+            <Feather
+              name="square"
+              size={24}
+              color={props.kentoEntity.isUsed ? "white" : "black"}
+            />
+          ) : (
+            <Text style={{ color: "grey", textAlign: "right" }}>unusable</Text>
+          )}
+          <Image
+            style={{
+              width: 60,
+              height: 60,
+              marginTop: 5,
+              marginBottom: 5,
+            }}
+            source={imageDict[props.kentoEntity.access_type]}
+          />
+          <Text style={sharedStyles.blackText}>
+            {props.kentoEntity.access_name}
+          </Text>
+          {props.kentoEntity.price !== undefined && (
+            <Text style={sharedStyles.blackText}>
+              {props.kentoEntity.price}
+            </Text>
+          )}
+        </View>
       </Pressable>
     </View>
   );
@@ -105,17 +146,80 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
   // Functions
   const validateSelection = () => {
     var newEnrichedUsers: EnrichedUser[] = Object.assign([], enrichedUsers);
-    for (const badgeEntity of newEnrichedUsers[selectedUserIndex]
-      .badgeEntities) {
-      if (badgeEntity.isSelect) {
-        badgeEntity.isUsed = true;
-        badgeEntity.isSelect = false;
-        badgeEntity.toUpdate = true;
+    for (const kentoEntity of newEnrichedUsers[selectedUserIndex]
+      .kentoEntities) {
+      if (kentoEntity.isSelect) {
+        kentoEntity.isUsed = true;
+        kentoEntity.isSelect = false;
+        kentoEntity.toUpdate = true;
+      }
+    }
+    for (let [index, kentoEntity] of offers.entries()) {
+      if (kentoEntity.isSelect) {
+        kentoEntity.isUsed = true;
+        kentoEntity.isSelect = false;
+        kentoEntity.toUpdate = true;
+        newEnrichedUsers[selectedUserIndex].kentoEntities.push(kentoEntity);
+        delete offers[index];
       }
     }
     setEnrichedUsers(newEnrichedUsers);
     handleCloseModalPress();
   };
+
+  const getUserGuestlists = async (
+    token: string,
+    owner_email: string,
+    event_id: string
+  ) => {
+    var myHeaders = new Headers();
+    myHeaders.append("Authorization", `Bearer ${token}`);
+    // myHeaders.append(
+    //   "Authorization",
+    //   `Bearer 1687187724797x532446159231898940`
+    // );
+
+    var formdata = new FormData();
+    formdata.append("owner_email", owner_email);
+    formdata.append("event_id", event_id);
+    // formdata.append("owner_email", "axel.duheme@gmail.com");
+    // formdata.append("event_id", "1686509948185x333270189445742600");
+
+    var requestOptions: RequestInit = {
+      method: "POST",
+      headers: myHeaders,
+      body: formdata,
+      redirect: "follow",
+    };
+
+    console.log(`devEnvironment: ${route.params.devEnvironment}`);
+
+    try {
+      const response = await fetch(
+        `${
+          route.params.devEnvironment ? devEndpoint : prodEndpoint
+        }/wf/get-user-guestlists`,
+        requestOptions
+      );
+      const json = await response.json();
+      console.log(`json: ${JSON.stringify(json)}`);
+      if ("entities_text" in json.response) {
+        const offers: [KentoEntity] = JSON.parse(json.response.entities_text);
+        console.log(
+          `entities: ${JSON.stringify(JSON.parse(json.response.entities_text))}`
+        );
+        setOffers(JSON.parse(json.response.entities_text));
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  };
+
+  // Variables
+  const [offers, setOffers] = useState<KentoEntity[]>([]);
+  const [displayOffers, setDisplayOffers] = useState(false);
+  const toggleSwitch = () =>
+    setDisplayOffers((previousState) => !previousState);
 
   return (
     <BottomSheetModalProvider>
@@ -125,22 +229,27 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
           index={1}
           snapPoints={snapPoints}
         >
-          <Pressable
-            style={({ pressed }) => [
-              {
-                opacity: pressed ? 0.6 : 1.0,
-              },
-              { alignItems: "flex-end", marginRight: "5%" },
-            ]}
-            onPress={() => {
-              handleCloseModalPress();
-            }}
-          >
-            <AntDesign name="close" size={24} color="black" />
-          </Pressable>
-
           {selectedUserIndex != -1 ? (
             <>
+              <Pressable
+                style={{ alignItems: "flex-end", marginRight: "5%" }}
+                onPress={() => {
+                  toggleSwitch();
+                  if (!displayOffers) {
+                    getUserGuestlists(
+                      token,
+                      enrichedUsers[selectedUserIndex].email,
+                      selectedEvent
+                    );
+                  }
+                }}
+              >
+                <Text
+                  style={{ fontWeight: "600", textDecorationLine: "underline" }}
+                >
+                  {displayOffers ? "See passes" : "See offers"}
+                </Text>
+              </Pressable>
               <Text
                 style={{
                   fontSize: 16,
@@ -150,25 +259,34 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
                   marginLeft: "5%",
                 }}
               >
-                {enrichedUsers[selectedUserIndex].last_name},{" "}
-                {enrichedUsers[selectedUserIndex].first_name}
+                {enrichedUsers[selectedUserIndex].first_name}{" "}
+                {enrichedUsers[selectedUserIndex].last_name}
               </Text>
               <Text
                 style={{
                   fontSize: 14,
+                  fontWeight: "300",
                   lineHeight: 21,
                   letterSpacing: 0.25,
+                  marginLeft: "5%",
                 }}
               >
                 {enrichedUsers[selectedUserIndex].email}
               </Text>
+
               <ScrollView
                 horizontal={true}
                 style={{ width: "90%", marginLeft: "5%" }}
               >
-                {enrichedUsers[selectedUserIndex].badgeEntities.map((item) => (
-                  <BadgeEntityItem key={item._id} badgeEntity={item} />
-                ))}
+                {displayOffers
+                  ? offers.map((item) => (
+                      <KentoEntityItem key={item._id} kentoEntity={item} />
+                    ))
+                  : enrichedUsers[selectedUserIndex].kentoEntities.map(
+                      (item) => (
+                        <KentoEntityItem key={item._id} kentoEntity={item} />
+                      )
+                    )}
               </ScrollView>
               <View
                 style={{
@@ -184,9 +302,12 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
                     {
                       opacity: pressed ? 0.6 : 1.0,
                     },
-                    enrichedUsers[selectedUserIndex].badgeEntities.filter(
-                      (item: BadgeEntity) => item.isSelect
-                    ).length > 0
+                    enrichedUsers[selectedUserIndex].kentoEntities.filter(
+                      (item: KentoEntity) => item.isSelect
+                    ).length +
+                      offers.filter((item: KentoEntity) => item.isSelect)
+                        .length >
+                    0
                       ? scanStyles.pinkButton
                       : scanStyles.greyButton,
                   ]}
@@ -195,11 +316,14 @@ export const ScanBottomSheet = forwardRef<Ref, Props>((props, ref) => {
                   }}
                 >
                   <Text style={sharedStyles.textPinkButton}>
-                    {enrichedUsers[selectedUserIndex].badgeEntities.filter(
-                      (item: BadgeEntity) => item.isSelect
-                    ).length > 0
+                    {enrichedUsers[selectedUserIndex].kentoEntities.filter(
+                      (item: KentoEntity) => item.isSelect
+                    ).length +
+                      offers.filter((item: KentoEntity) => item.isSelect)
+                        .length >
+                    0
                       ? "Validate"
-                      : "Select pass to validate"}
+                      : `Select pass to validate`}
                   </Text>
                 </Pressable>
               </View>

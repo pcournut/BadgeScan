@@ -31,6 +31,16 @@ const loginStyles = StyleSheet.create({
   focusCell: {
     borderColor: "#000",
   },
+  textInput: {
+    height: "7%",
+    width: "85%",
+    backgroundColor: Colors.ARGENT,
+    textAlign: "center",
+    borderColor: Colors.ARGENT,
+    borderRadius: 5,
+    marginTop: "2%",
+    marginBottom: "2%",
+  },
 });
 
 export default loginStyles;

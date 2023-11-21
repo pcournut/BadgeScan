@@ -2,9 +2,10 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React, { useEffect, useState } from "react";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { ScanScreenContext } from "../contexts/ScanScreenContext";
-import { Badge, BadgeEntity, EnrichedUser } from "../types";
+import { Access, KentoEntity, EnrichedUser, UpdatedEntity } from "../types";
 import { ListTab } from "./ListTab";
 import { CameraTab } from "./CameraTab";
+import { devEndpoint, prodEndpoint } from "../constants";
 
 const Tab = createBottomTabNavigator();
 
@@ -13,6 +14,10 @@ const listName = "List";
 
 export const ScanScreen = ({ navigation, route }) => {
   // Context variables
+  const [token, setToken] = useState(route.params.token);
+  const [selectedEvent, setSelectedEvent] = useState(
+    route.params.selectedEvent
+  );
   const [enrichedUsers, setEnrichedUsers] = useState<EnrichedUser[]>(
     route.params.enrichedUsers
   );
@@ -20,25 +25,54 @@ export const ScanScreen = ({ navigation, route }) => {
   const [lastQueryUnixTimeStamp, setLastQueryUnixTimeStamp] = useState<number>(
     Date.now()
   );
+  const [failedKentoEntities, setFailedKentoEntities] = useState<string[]>([]);
 
   // Functions
+  const callUpdate = () => {
+    var changedKentoEntities = [];
+    for (const user of enrichedUsers) {
+      for (const kentoEntity of user.kentoEntities) {
+        if (kentoEntity.toUpdate) {
+          changedKentoEntities = changedKentoEntities.concat(kentoEntity._id);
+          kentoEntity.toUpdate = false;
+        }
+      }
+    }
+    participantListUpdate(
+      [...failedKentoEntities, ...changedKentoEntities],
+      route.params.token,
+      route.params.accesses,
+      route.params.scanTerminal
+    );
+  };
+
   const participantListUpdate = async (
-    badgeEntityIds: string[],
+    kentoEntityIds: string[],
     token: string,
-    badges: [Badge],
+    accesses: [Access],
     scanTerminal: string
   ) => {
+    const TIMEOUT = 25000; // Set your timeout value
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), TIMEOUT);
+
     var myHeaders = new Headers();
     myHeaders.append("Authorization", `Bearer ${token}`);
 
     var formdata = new FormData();
     formdata.append(
-      "ChangedBadgeEntities",
-      `[${badgeEntityIds.map((item) => '"' + item + '"')}]`
+      "scanned_entities",
+      `[${kentoEntityIds.map((item) => '"' + item + '"')}]`
     );
-    formdata.append("ScanTerminal", `${scanTerminal}`);
-    formdata.append("Badges", `[${badges.map(({ _id }) => '"' + _id + '"')}]`);
-    formdata.append("LastQueryUnixTimeStamp", `${lastQueryUnixTimeStamp}`);
+    formdata.append("scan_terminal", `${scanTerminal}`);
+    formdata.append(
+      "accesses",
+      `[${accesses.map(({ _id }) => '"' + _id + '"')}]`
+    );
+    formdata.append(
+      "last_query_unix_timestamp",
+      `${lastQueryUnixTimeStamp.toString()}`
+    );
 
     var requestOptions: RequestInit = {
       method: "POST",
@@ -49,41 +83,110 @@ export const ScanScreen = ({ navigation, route }) => {
 
     try {
       const response = await fetch(
-        "https://club-soda-test-pierre.bubbleapps.io/version-test/api/1.1/wf/ParticipantListUpdate",
-        requestOptions
-      );
+        `${
+          route.params.devEnvironment ? devEndpoint : prodEndpoint
+        }/wf/participant-list-update`,
+        // Time-out debug URL
+        // "http://www.google.com:81/",
+        { signal: controller.signal, ...requestOptions }
+      )
+        .catch((e) => {
+          if (e.name === "AbortError") {
+            // If the request times out, add the entityIds to the failed list
+            const newFailedKentoEntities = Array.from(
+              new Set([...failedKentoEntities, ...kentoEntityIds])
+            );
+            setFailedKentoEntities(newFailedKentoEntities);
+            throw new Error("Request timed out");
+          }
+
+          throw e;
+        })
+        .finally(() => clearTimeout(id));
+
+      if (!response.ok) {
+        // If server response is not ok, add the entityIds to the failed list
+        const newFailedKentoEntities = Array.from(
+          new Set([...failedKentoEntities, ...kentoEntityIds])
+        );
+        setFailedKentoEntities(newFailedKentoEntities);
+        throw new Error("Server response was not ok");
+      }
+
       const json = await response.json();
       var newEnrichedUsers: EnrichedUser[] = Object.assign([], enrichedUsers);
-      if (json.response.participantsUpdate.length > 1) {
-        for (const badgeEntityString of json.response.participantsUpdate) {
-          const badgeEntity = JSON.parse(badgeEntityString);
-          const userIndex = enrichedUsers.findIndex(
-            (item: EnrichedUser) => item._id === badgeEntity.userId
-          );
-          const badgeEntityIndex = enrichedUsers[
-            userIndex
-          ].badgeEntities.findIndex(
-            (item: BadgeEntity) => item._id === badgeEntity.badgeEntityId
-          );
-          newEnrichedUsers[userIndex].badgeEntities[badgeEntityIndex].isUsed =
-            badgeEntity.isUsed === "oui";
+      if ("updated_entities_text" in json.response) {
+        const updatedEntities: [UpdatedEntity] = JSON.parse(
+          json.response.updated_entities_text
+        );
+        console.log(`Number of updated entities: ${updatedEntities.length}`);
+        if (updatedEntities.length > 0) {
+          console.log(JSON.stringify(updatedEntities));
+          for (const updatedEntity of updatedEntities) {
+            const userIndex = enrichedUsers.findIndex(
+              // (item: EnrichedUser) => item._id === updatedEntity.owner._id
+              (item: EnrichedUser) => item.email === updatedEntity.owner.email
+            );
+            if (userIndex !== -1) {
+              const kentoEntityIndex = enrichedUsers[
+                userIndex
+              ].kentoEntities.findIndex(
+                (item: KentoEntity) => item._id === updatedEntity._id
+              );
+              if (kentoEntityIndex !== -1) {
+                newEnrichedUsers[userIndex].kentoEntities[
+                  kentoEntityIndex
+                ].isUsed = updatedEntity.scan_terminal !== undefined;
+              } else {
+                const kentoEntity: KentoEntity = {
+                  _id: updatedEntity._id,
+                  access: updatedEntity.access,
+                  owner: updatedEntity.owner._id,
+                  owner_email: updatedEntity.owner.email,
+                  scan_terminal: updatedEntity.scan_terminal,
+                  isUsed:
+                    updatedEntity.scan_terminal !== undefined &&
+                    updatedEntity.scan_terminal.length > 0,
+                };
+                newEnrichedUsers[userIndex].kentoEntities.push(kentoEntity);
+              }
+            } else {
+              const kentoEntity: KentoEntity = {
+                _id: updatedEntity._id,
+                access: updatedEntity.access,
+                owner: updatedEntity.owner._id,
+                owner_email: updatedEntity.owner.email,
+                scan_terminal: updatedEntity.scan_terminal,
+                isUsed:
+                  updatedEntity.scan_terminal !== undefined &&
+                  updatedEntity.scan_terminal.length > 0,
+              };
+              const enrichedUser: EnrichedUser = {
+                // _id: updatedEntity.owner._id,
+                first_name:
+                  "first_name" in updatedEntity.owner
+                    ? updatedEntity.owner.first_name
+                    : updatedEntity.owner.email,
+                last_name:
+                  "last_name" in updatedEntity.owner
+                    ? updatedEntity.owner.last_name
+                    : "",
+                email: updatedEntity.owner.email,
+                kentoEntities: [kentoEntity],
+              };
+              newEnrichedUsers.push(enrichedUser);
+            }
+          }
         }
-      } else if (json.response.participantsUpdate.length == 1) {
-        const badgeEntity = JSON.parse(json.response.participantsUpdate);
-        const userIndex = enrichedUsers.findIndex(
-          (item: EnrichedUser) => item._id === badgeEntity.userId
-        );
-        const badgeEntityIndex = enrichedUsers[
-          userIndex
-        ].badgeEntities.findIndex(
-          (item: BadgeEntity) => item._id === badgeEntity.badgeEntityId
-        );
-        newEnrichedUsers[userIndex].badgeEntities[badgeEntityIndex].isUsed =
-          badgeEntity.isUsed === "oui";
+      } else {
+        console.log(`Empty updated entities.`);
       }
       setEnrichedUsers(newEnrichedUsers);
-      console.log("Updated with server.");
-      setLastQueryUnixTimeStamp(json.response.LastQueryUnixTimeStamp);
+      // When a response is successful, remove the corresponding entityIds from the failed list
+      const newFailedKentoEntities = Array.from(
+        new Set([...failedKentoEntities, ...kentoEntityIds])
+      );
+      setFailedKentoEntities(newFailedKentoEntities);
     } catch (error) {
       console.log("error", error);
     }
@@ -92,24 +195,13 @@ export const ScanScreen = ({ navigation, route }) => {
   // Server update
   useEffect(() => {
     const interval = setInterval(() => {
-      var changedBadgeEntities = [];
-      for (const user of enrichedUsers) {
-        for (const badgeEntity of user.badgeEntities) {
-          if (badgeEntity.toUpdate) {
-            changedBadgeEntities = changedBadgeEntities.concat(badgeEntity._id);
-            badgeEntity.toUpdate = false;
-          }
-        }
-      }
-      participantListUpdate(
-        changedBadgeEntities,
-        route.params.token,
-        route.params.badges,
-        route.params.scanTerminal
-      );
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+      callUpdate();
+    }, 30000);
+    return () => {
+      clearInterval(interval);
+      callUpdate();
+    };
+  }, [failedKentoEntities]);
 
   return (
     <ScanScreenContext.Provider
@@ -118,6 +210,8 @@ export const ScanScreen = ({ navigation, route }) => {
         setEnrichedUsers,
         selectedUserIndex,
         setSelectedUserIndex,
+        token,
+        selectedEvent,
       }}
     >
       <Tab.Navigator

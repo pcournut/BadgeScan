@@ -35,9 +35,11 @@ const scanStyles = StyleSheet.create({
     textAlign: "center",
     paddingTop: "2%",
   },
-  badgeEntityContainer: {
+  kentoEntityContainer: {
+    // height: 100,
+    // width: 100,
     justifyContent: "center",
-    paddingRight: 30,
+    paddingRight: 10,
   },
   greyButton: {
     alignItems: "center",
