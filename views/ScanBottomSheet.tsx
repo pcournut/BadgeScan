@@ -174,16 +174,10 @@ export const ScanBottomSheet = forwardRef<Ref, { route: any }>((props, ref) => {
   ) => {
     var myHeaders = new Headers();
     myHeaders.append("Authorization", `Bearer ${token}`);
-    // myHeaders.append(
-    //   "Authorization",
-    //   `Bearer 1687187724797x532446159231898940`
-    // );
 
     var formdata = new FormData();
     formdata.append("owner_email", owner_email);
     formdata.append("event_id", event_id);
-    // formdata.append("owner_email", "axel.duheme@gmail.com");
-    // formdata.append("event_id", "1686509948185x333270189445742600");
 
     var requestOptions: RequestInit = {
       method: "POST",
